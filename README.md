@@ -119,3 +119,15 @@ Cameroon, October 2026
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE)
+
+## 🔧 Required Forks
+
+To run this system, you need these modified versions:
+
+| Component | Fork/Branch | Description |
+|-----------|-------------|-------------|
+| Open5GS | [PR #4864](https://github.com/open5gs/open5gs/pull/4864) | Adds SBc-AP Write-Replace-Warning support |
+| srsRAN | [PR #1555](https://github.com/srsran/srsRAN_4G/pull/1555) | Adds PWS SIB12 live broadcast |
+| osmo-cbc | Patch in `patches/` | Fixes auto-expiration bug |
+
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for complete installation instructions.
