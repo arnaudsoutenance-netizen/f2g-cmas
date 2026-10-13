@@ -1,256 +1,121 @@
-# CMAS/PWS Cell Broadcast Emergency Alert System — Open5GS + srsRAN
+# F2G CMAS - Cell Broadcast Emergency Alert System
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![3GPP Release](https://img.shields.io/badge/3GPP-Rel--15-blue.svg)](https://www.3gpp.org/)
-[![Open5GS](https://img.shields.io/badge/Open5GS-v2.7-green.svg)](https://open5gs.org/)
-[![srsRAN](https://img.shields.io/badge/srsRAN-v23.11-orange.svg)](https://www.srsran.com/)
+Complete implementation of **CMAS/ETWS** (Commercial Mobile Alert System / Earthquake and Tsunami Warning System) using open-source components.
 
-Complete implementation of **Cell Broadcast Service (CBS)** for emergency alerts on a private LTE network using Open5GS and srsRAN with bladeRF SDR.
+## 🎯 Features
 
-## 🎯 Objective
+- ✅ **Full 3GPP Compliant** - PWS (Public Warning System) per 3GPP TS 23.041, TS 29.168
+- ✅ **End-to-End Chain** - CBC → MME → eNB → UE validated
+- ✅ **Auto-Expiration** - Messages automatically expire after broadcast duration
+- ✅ **Stop-Warning** - Kill command to stop ongoing alerts
+- ✅ **Multi-TAC** - Support for multiple Tracking Areas (multi-eNB)
+- ✅ **All Alert Types** - Presidential, Extreme, Severe, AMBER, Public Safety
 
-Enable **Write-Replace-Warning** message broadcast to all UEs in a cell for emergency alerts:
-- **CMAS** (Commercial Mobile Alert System) — Presidential, AMBER, Extreme/Severe threats
-- **ETWS** (Earthquake and Tsunami Warning System) — Immediate seismic alerts
-- **PWS** (Public Warning System) — Generic emergency broadcast
+## 📦 Components
 
-## 📊 Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    CELL BROADCAST ARCHITECTURE                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────────┐  │
-│   │   CBC    │────▶│   MME    │────▶│   eNB    │────▶│    UE Phones     │  │
-│   │ (Alert   │     │ (Core    │     │ (Radio   │     │ (Receive Alert)  │  │
-│   │  Center) │     │ Network) │     │  Tower)  │     │                  │  │
-│   └──────────┘     └──────────┘     └──────────┘     └──────────────────┘  │
-│                                                                              │
-│   Protocol:         SBc/SBCAP        S1AP             SIB10/11/12           │
-│                                                                              │
-│   Message:      Write-Replace    WriteReplace       System Info            │
-│                 Warning-Request  WarningRequest     Broadcast              │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Network Topology
-
-```
-┌─────────────────┐                    ┌─────────────────────────────────────┐
-│       PC1       │                    │         DOCKER (172.22.0.x)         │
-│  192.168.1.100  │                    │                                     │
-│  ┌───────────┐  │      S1AP/SCTP     │  ┌─────┐  ┌─────┐  ┌─────┐        │
-│  │  srsENB   │──┼────────────────────┼──│ MME │  │ HSS │  │PCRF │        │
-│  │           │  │                    │  │ .9  │  │ .3  │  │ .4  │        │
-│  │ bladeRF   │  │                    │  └─────┘  └─────┘  └─────┘        │
-│  │   xA4     │  │                    │                                     │
-│  └─────┬─────┘  │                    │  ┌─────┐  ┌─────┐  ┌─────┐        │
-│        │ RF     │                    │  │SGWC │  │SGWU │  │ UPF │        │
-│        ▼        │                    │  │ .5  │  │ .6  │  │ .8  │        │
-│  ┌───────────┐  │                    │  └─────┘  └─────┘  └─────┘        │
-│  │   UEs     │  │                    │                                     │
-│  │ (Phones)  │  │                    │  ┌─────────────────────────────┐   │
-│  └───────────┘  │                    │  │          IMS (VoLTE)        │   │
-│                 │                    │  │ PCSCF .21  SCSCF .20        │   │
-└─────────────────┘                    │  └─────────────────────────────┘   │
-                                       └─────────────────────────────────────┘
-```
-
-## 📋 Alert Types
-
-### CMAS — Commercial Mobile Alert System (SIB12)
-
-| Alert Type | Message ID | Disable? | Use Case |
-|------------|------------|----------|----------|
-| **Presidential** | 4370 | ❌ NO | National emergencies, cannot be opted out |
-| **Extreme Threat** | 4371-4372 | ✅ Yes | Imminent life-threatening danger |
-| **Severe Threat** | 4373-4378 | ✅ Yes | Significant threat to life/property |
-| **AMBER Alert** | 4379 | ✅ Yes | Child abduction |
-| **Public Safety** | 4383-4391 | ✅ Yes | General safety messages |
-| **Test** | 4380 | ✅ Yes | Monthly required tests |
-
-### ETWS — Earthquake & Tsunami Warning (SIB10/11)
-
-| Alert Type | Message ID | Delivery Time |
-|------------|------------|---------------|
-| **Earthquake** | 4352 | < 4 seconds |
-| **Tsunami** | 4353 | < 4 seconds |
-| **Combined** | 4354 | < 4 seconds |
+| Component | Version | Role |
+|-----------|---------|------|
+| **osmo-cbc** | 0.5.3 (patched) | Cell Broadcast Centre |
+| **Open5GS MME** | Fork with SBc-AP | Mobility Management Entity |
+| **srsRAN** | Fork with PWS | eNodeB (LTE base station) |
+| **bladeRF** | xA4 | Software Defined Radio |
 
 ## 🚀 Quick Start
 
-### 1. Start Core Network
-
+### 1. Start osmo-cbc (patched)
 ```bash
-cd /home/f2g/Telecom/Core-Network/openimss
-docker-compose up -d
+cd /tmp/f2g_cmas/cbc
+/usr/bin/osmo-cbc-patched -c osmo-cbc.cfg > /tmp/osmo.log 2>&1 &
 ```
 
-### 2. Start eNB with PWS Config
-
+### 2. Send an alert
 ```bash
-sudo srsenb /home/f2g/Desktop/CMAS-PWS/configs/srsran/enb_pws.conf
+./scripts/alert.sh send "EARTHQUAKE WARNING" 4370 60
 ```
 
-### 3. Send Alert
-
+### 3. List messages
 ```bash
-# Presidential Alert
-./scripts/send_alert.sh presidential "NATIONAL EMERGENCY - This is a test"
+./scripts/alert.sh list
+```
 
-# AMBER Alert
-./scripts/send_alert.sh amber "AMBER Alert - Missing child in Yaoundé"
-
-# Earthquake Alert
-./scripts/send_alert.sh earthquake "EARTHQUAKE WARNING - Take cover immediately"
+### 4. Stop an alert
+```bash
+./scripts/alert.sh stop 4370
 ```
 
 ## 📁 Repository Structure
 
 ```
-CMAS-PWS/
-├── README.md                         # This file
-├── LICENSE
+f2g-cmas/
 ├── configs/
-│   ├── srsran/
-│   │   ├── enb_pws.conf             # eNB config with PWS enabled
-│   │   ├── enb_tac1_cmas.conf       # TAC 1 (Yaoundé) config
-│   │   ├── enb_tac2_cmas.conf       # TAC 2 (Douala) config
-│   │   ├── sib_pws.conf             # SIB with SIB10/11/12 enabled
-│   │   └── sib_cmas.conf            # CMAS-specific SIB config
-│   └── open5gs/
-│       └── mme.yaml                 # MME config for PWS
-├── docs/
-│   ├── SPECIFICATION.md             # What the system does
-│   ├── IMPLEMENTATION.md            # How to build it
-│   ├── COMPLETE_SETUP.md            # Full configuration guide
-│   └── MANUAL_LAUNCH_GUIDE.md       # Step-by-step launch procedure
-├── procedures/
-│   ├── 01-PREREQUISITES.md
-│   ├── 02-INSTALLATION.md
-│   ├── 03-ENB-CONFIGURATION.md
-│   ├── 04-ALERT-INJECTION.md
-│   ├── 05-TESTING.md
-│   └── 06-TROUBLESHOOTING.md
+│   ├── osmo-cbc/        # CBC configuration
+│   ├── open5gs/         # MME configuration
+│   └── srsran/          # eNB configuration
+├── patches/
+│   └── osmo-cbc-expiration-timer.patch  # Auto-expiration fix
 ├── scripts/
-│   ├── send_alert.sh                # Main alert sending script
-│   ├── inject_write_replace_warning.py
-│   └── start_cmas_lab.sh            # Lab startup script
-├── diagrams/
-│   └── pws_message_flow.md          # Mermaid sequence diagrams
-├── images/
-│   └── architecture_diagram.png
-├── pcap/
-│   └── CMAS_WriteReplaceWarning.pcap
-└── logs/
-    └── mme_cmas.log
+│   └── alert.sh         # Main alert script
+├── docs/
+│   ├── COMMANDS.md      # Command reference
+│   ├── COMPLETE_SETUP.md
+│   └── ...
+└── README.md
 ```
 
-## 📚 Documentation
+## 🔧 Patches Applied
 
-| Document | Description |
-|----------|-------------|
-| [SPECIFICATION.md](docs/SPECIFICATION.md) | Goals, non-goals, success criteria |
-| [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Technical implementation details |
-| [COMPLETE_SETUP.md](docs/COMPLETE_SETUP.md) | Full configuration with all parameters |
-| [MANUAL_LAUNCH_GUIDE.md](docs/MANUAL_LAUNCH_GUIDE.md) | Step-by-step launch with Wireshark |
+### osmo-cbc Auto-Expiration Patch
+**Bug fixed:** Messages stayed "active" forever instead of expiring.
 
-## 🔧 Key Configuration
+**Solution:** Added timer `T_MSG_EXPIRATION` that triggers `ACTIVE → DELETED` transition after `num_bcast × rep_period + 5s`.
 
-### eNB Configuration (enb_pws.conf)
-
-```ini
-[enb]
-enb_id = 0x19B
-mcc = 001
-mnc = 01
-mme_addr = 172.22.0.9
-n_prb = 50
-
-[enb_files]
-sib_config = sib_pws.conf
-
-[rf]
-dl_earfcn = 1450
-device_name = bladeRF
+Apply patch:
+```bash
+cd osmo-cbc-source/
+git apply patches/osmo-cbc-expiration-timer.patch
+make -j$(nproc)
+sudo cp src/.libs/osmo-cbc /usr/bin/osmo-cbc-patched
 ```
 
-### SIB Configuration for PWS
+## ⏱️ Auto-Expiration Formula
 
 ```
-sib10 = {
-    messageIdentifier = 0x1112;
-    serialNumber = 0x3000;
-    warningType = "earthquake";
-}
-
-sib12 = {
-    messageIdentifier = 0x1112;
-    serialNumber = 0x3000;
-    warningMessageSegmentType = "notLastSegment";
-    warningMessageSegmentNumber = 0;
-    warningMessageSegment = "EMERGENCY ALERT";
-}
+Expiration = (num_bcast × rep_period) + 5 seconds
 ```
 
-## 📡 3GPP Specifications
+| Duration | Expiration |
+|----------|------------|
+| 15s | 20s |
+| 30s | 35s |
+| 60s | 65s |
 
-| Specification | Title |
-|---------------|-------|
-| TS 23.041 | Technical realization of Cell Broadcast Service (CBS) |
-| TS 23.038 | Alphabets and language-specific information |
-| TS 36.331 | E-UTRA RRC Protocol specification (SIB10/11/12) |
-| TS 29.168 | SBcAP Protocol (CBC ↔ MME) |
-| TS 36.413 | S1AP Protocol (WriteReplaceWarningRequest) |
+## 📋 Message IDs (3GPP)
 
-## 🔍 Wireshark Filters
+| ID | Type |
+|----|------|
+| 4370 | Presidential Alert |
+| 4371-4372 | Extreme Alert |
+| 4373-4378 | Severe Alert |
+| 4379 | AMBER Alert |
+| 4380 | Public Safety |
 
-```
-# All S1AP PWS messages
-s1ap.procedureCode == 36
+## 🔗 Related PRs
 
-# WriteReplaceWarningRequest
-s1ap.WriteReplaceWarningRequest
+- **Open5GS**: [PR #4864](https://github.com/open5gs/open5gs/pull/4864) - SBc-AP Write-Replace-Warning
+- **srsRAN**: [PR #1555](https://github.com/srsran/srsRAN_4G/pull/1555) - PWS SIB12 broadcast
 
-# LTE-RRC SIB12 (CMAS)
-lte-rrc.systemInformationBlockType12_element
+## 📚 References
 
-# LTE-RRC SIB10/11 (ETWS)
-lte-rrc.systemInformationBlockType10_element || lte-rrc.systemInformationBlockType11_element
-```
+- 3GPP TS 23.041 - Cell Broadcast Service
+- 3GPP TS 29.168 - SBc-AP Protocol
+- 3GPP TS 36.331 - RRC Protocol (SIB12)
+- ETSI TS 123 041 - CBS Technical Realization
 
-## 🛠️ Troubleshooting
+## 👤 Author
 
-### Alert not displayed on phone
+**Arnaud DJOUM** - F2G TelcoLab  
+Cameroon, October 2026
 
-1. Check SIB12 broadcast: `lte-rrc.systemInformationBlockType12_element`
-2. Verify Message ID matches CMAS range (4370-4399)
-3. Ensure phone has emergency alerts enabled
+## 📄 License
 
-### MME not forwarding alert
-
-1. Check SBcAP connection to CBC
-2. Verify TAC list includes target cell
-3. Check MME logs: `docker logs mme | grep -i warning`
-
-### eNB not broadcasting SIB
-
-1. Verify `sib_config` path in enb.conf
-2. Check SIB file syntax
-3. Restart eNB after config changes
-
-## 📜 License
-
-MIT License — See [LICENSE](LICENSE) file
-
-## 👨‍💻 Author
-
-**Arnaud DJOUM** — F2G TelcoLab  
-Private LTE Lab — Cameroon
-
----
-
-*Created: 2026-10-01*  
-*Based on: Open5GS v2.7 + srsRAN v23.11*
+MIT License - See [LICENSE](LICENSE)
