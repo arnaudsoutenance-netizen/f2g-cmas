@@ -1,133 +1,118 @@
-# F2G CMAS - Cell Broadcast Emergency Alert System
+# F2G CMAS/PWS System
 
-Complete implementation of **CMAS/ETWS** (Commercial Mobile Alert System / Earthquake and Tsunami Warning System) using open-source components.
+![PKF Telco](https://img.shields.io/badge/PKF-Telco-blue)
+![LTE](https://img.shields.io/badge/LTE-4G-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## 🎯 Features
+## 🚨 Cell Broadcast Emergency Alert System
 
-- ✅ **Full 3GPP Compliant** - PWS (Public Warning System) per 3GPP TS 23.041, TS 29.168
-- ✅ **End-to-End Chain** - CBC → MME → eNB → UE validated
-- ✅ **Auto-Expiration** - Messages automatically expire after broadcast duration
-- ✅ **Stop-Warning** - Kill command to stop ongoing alerts
-- ✅ **Multi-TAC** - Support for multiple Tracking Areas (multi-eNB)
-- ✅ **All Alert Types** - Presidential, Extreme, Severe, AMBER, Public Safety
+Système complet d'alertes d'urgence CMAS (Commercial Mobile Alert System) / PWS (Public Warning System) pour réseau LTE privé.
 
-## 📦 Components
+### Architecture
 
-| Component | Version | Role |
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   API REST  │────▶│  osmo-cbc   │────▶│  Open5GS    │────▶│  srsRAN     │────▶ UE
+│   (curl)    │     │  (CBC)      │     │  MME        │     │  eNB        │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+                         │                    │                    │
+                    SBc-AP (29168)      S1AP (36412)          SIB12 (Air)
+```
+
+### Composants
+
+| Composant | Version | Rôle |
 |-----------|---------|------|
-| **osmo-cbc** | 0.5.3 (patched) | Cell Broadcast Centre |
-| **Open5GS MME** | Fork with SBc-AP | Mobility Management Entity |
-| **srsRAN** | Fork with PWS | eNodeB (LTE base station) |
-| **bladeRF** | xA4 | Software Defined Radio |
+| Open5GS | PR #4864 | MME avec support SBc-AP |
+| osmo-cbc | latest | Cell Broadcast Centre |
+| srsRAN 4G | pws-cmas-support | eNB avec génération SIB12 |
 
-## 🚀 Quick Start
+### Quick Start
 
-### 1. Start osmo-cbc (patched)
 ```bash
-cd /tmp/f2g_cmas/cbc
-/usr/bin/osmo-cbc-patched -c osmo-cbc.cfg > /tmp/osmo.log 2>&1 &
+# 1. Démarrer le Core Network Docker
+cd /home/f2g/docker_open5gs
+docker-compose up -d mongo hss sgwc sgwu smf upf
+
+# 2. Démarrer le MME
+/usr/local/bin/open5gs-mmed -c configs/mme/mme-sbcap.yaml &
+
+# 3. Démarrer osmo-cbc
+cd configs/cbc && osmo-cbc -c osmo-cbc.cfg &
+
+# 4. Démarrer l'eNB
+cd configs/enb && sudo srsenb enb.conf &
+
+# 5. Envoyer une alerte
+./scripts/alert.sh send "ALERTE URGENCE" 4370 60 tac:1
 ```
 
-### 2. Send an alert
-```bash
-./scripts/alert.sh send "EARTHQUAKE WARNING" 4370 60
-```
+### Documentation
 
-### 3. List messages
-```bash
-./scripts/alert.sh list
-```
+📄 **Guide complet** : [docs/CMAS_PKF_TELCO_GUIDE.pdf](docs/CMAS_PKF_TELCO_GUIDE.pdf)
 
-### 4. Stop an alert
-```bash
-./scripts/alert.sh stop 4370
-```
-
-## 📁 Repository Structure
+### Structure du projet
 
 ```
 f2g-cmas/
 ├── configs/
-│   ├── osmo-cbc/        # CBC configuration
-│   ├── open5gs/         # MME configuration
-│   └── srsran/          # eNB configuration
-├── patches/
-│   └── osmo-cbc-expiration-timer.patch  # Auto-expiration fix
+│   ├── mme/
+│   │   ├── mme-sbcap.yaml      # Config MME avec SBc-AP
+│   │   └── mme-fork-fd.conf    # Config freeDiameter
+│   ├── cbc/
+│   │   └── osmo-cbc.cfg        # Config Cell Broadcast Centre
+│   └── enb/
+│       ├── enb.conf            # Config eNB srsRAN
+│       └── sib_pws.conf        # Config SIB avec SIB12
 ├── scripts/
-│   └── alert.sh         # Main alert script
+│   └── alert.sh                # Script d'envoi d'alertes
 ├── docs/
-│   ├── COMMANDS.md      # Command reference
-│   ├── COMPLETE_SETUP.md
-│   └── ...
-└── README.md
+│   ├── CMAS_PKF_TELCO_GUIDE.pdf  # Guide complet (24 pages)
+│   └── CMAS_PKF_TELCO_GUIDE.tex  # Source LaTeX
+├── patches/                    # Patches srsRAN si nécessaire
+├── diagrams/                   # Diagrammes d'architecture
+├── pcap/                       # Captures réseau exemples
+└── images/                     # Screenshots
 ```
 
-## 🔧 Patches Applied
+### Commandes d'alertes
 
-### osmo-cbc Auto-Expiration Patch
-**Bug fixed:** Messages stayed "active" forever instead of expiring.
-
-**Solution:** Added timer `T_MSG_EXPIRATION` that triggers `ACTIVE → DELETED` transition after `num_bcast × rep_period + 5s`.
-
-Apply patch:
 ```bash
-cd osmo-cbc-source/
-git apply patches/osmo-cbc-expiration-timer.patch
-make -j$(nproc)
-sudo cp src/.libs/osmo-cbc /usr/bin/osmo-cbc-patched
+# Envoyer une alerte sur TAC 1
+./scripts/alert.sh send "MESSAGE D'URGENCE" 4370 60 tac:1
+
+# Envoyer une alerte sur TAC 2
+./scripts/alert.sh send "ALERTE SEISME" 4370 120 tac:2
+
+# Lister les alertes actives
+./scripts/alert.sh list
+
+# Stopper une alerte
+./scripts/alert.sh stop 4370
 ```
 
-## ⏱️ Auto-Expiration Formula
+### Message IDs (3GPP TS 23.041)
 
-```
-Expiration = (num_bcast × rep_period) + 5 seconds
-```
+| ID | Type | Description |
+|----|------|-------------|
+| 4370 | Presidential | Alerte présidentielle |
+| 4371-4372 | Extreme | Menace extrême |
+| 4373-4378 | Severe | Menace sévère |
+| 4379-4392 | Amber | Alerte enlèvement |
 
-| Duration | Expiration |
-|----------|------------|
-| 15s | 20s |
-| 30s | 35s |
-| 60s | 65s |
+### Références
 
-## 📋 Message IDs (3GPP)
+- [3GPP TS 23.041](https://www.3gpp.org/DynaReport/23041.htm) - Cell Broadcast Service
+- [3GPP TS 29.168](https://www.3gpp.org/DynaReport/29168.htm) - SBc-AP Interface
+- [3GPP TS 36.331](https://www.3gpp.org/DynaReport/36331.htm) - RRC Protocol (SIB12)
+- [Open5GS](https://open5gs.org/)
+- [srsRAN](https://www.srsran.com/)
+- [osmo-cbc](https://osmocom.org/projects/osmo-cbc)
 
-| ID | Type |
-|----|------|
-| 4370 | Presidential Alert |
-| 4371-4372 | Extreme Alert |
-| 4373-4378 | Severe Alert |
-| 4379 | AMBER Alert |
-| 4380 | Public Safety |
+### Auteur
 
-## 🔗 Related PRs
+**Arnaud DJOUM** — F2G / PKF Telco — Cameroun
 
-- **Open5GS**: [PR #4864](https://github.com/open5gs/open5gs/pull/4864) - SBc-AP Write-Replace-Warning
-- **srsRAN**: [PR #1555](https://github.com/srsran/srsRAN_4G/pull/1555) - PWS SIB12 broadcast
+### License
 
-## 📚 References
-
-- 3GPP TS 23.041 - Cell Broadcast Service
-- 3GPP TS 29.168 - SBc-AP Protocol
-- 3GPP TS 36.331 - RRC Protocol (SIB12)
-- ETSI TS 123 041 - CBS Technical Realization
-
-## 👤 Author
-
-**Arnaud DJOUM** - F2G TelcoLab  
-Cameroon, October 2026
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE)
-
-## 🔧 Required Forks
-
-To run this system, you need these modified versions:
-
-| Component | Fork/Branch | Description |
-|-----------|-------------|-------------|
-| Open5GS | [PR #4864](https://github.com/open5gs/open5gs/pull/4864) | Adds SBc-AP Write-Replace-Warning support |
-| srsRAN | [PR #1555](https://github.com/srsran/srsRAN_4G/pull/1555) | Adds PWS SIB12 live broadcast |
-| osmo-cbc | Patch in `patches/` | Fixes auto-expiration bug |
-
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for complete installation instructions.
+MIT License - voir [LICENSE](LICENSE)

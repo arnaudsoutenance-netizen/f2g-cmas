@@ -1,0 +1,1243 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{fontawesome5}
+
+\geometry{margin=2.5cm, top=3cm, bottom=2.5cm}
+
+% ============================================================================
+% COULEURS PKF TELCO
+% ============================================================================
+\definecolor{pkfblue}{RGB}{31,56,100}
+\definecolor{pkforange}{RGB}{236,130,54}
+\definecolor{pkfgray}{RGB}{80,80,80}
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{220,220,220}
+\definecolor{successgreen}{RGB}{40,167,69}
+\definecolor{warningyellow}{RGB}{255,193,7}
+\definecolor{dangered}{RGB}{220,53,69}
+
+% ============================================================================
+% STYLES DES TITRES
+% ============================================================================
+\titleformat{\section}{\Large\bfseries\color{pkfblue}}{\thesection}{1em}{}[\color{pkforange}\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{pkfblue}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{pkfgray}}{\thesubsubsection}{1em}{}
+
+\titlespacing*{\section}{0pt}{20pt}{10pt}
+\titlespacing*{\subsection}{0pt}{15pt}{8pt}
+
+% ============================================================================
+% STYLE DU CODE
+% ============================================================================
+\lstdefinestyle{bashstyle}{
+    language=bash,
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{codeframe},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{pkfblue}\bfseries,
+    commentstyle=\color{successgreen},
+    stringstyle=\color{pkforange},
+    showstringspaces=false,
+    tabsize=2,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    aboveskip=1em,
+    belowskip=1em
+}
+
+\lstdefinestyle{yamlstyle}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{codeframe},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{pkfblue},
+    stringstyle=\color{pkforange},
+    showstringspaces=false,
+    tabsize=2,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    aboveskip=1em,
+    belowskip=1em
+}
+
+\lstdefinestyle{confstyle}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{codeframe},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    showstringspaces=false,
+    tabsize=2,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    aboveskip=1em,
+    belowskip=1em
+}
+
+\lstset{style=bashstyle}
+
+% ============================================================================
+% EN-TÊTE ET PIED DE PAGE
+% ============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{pkfblue}{\textbf{PKF Telco}}}
+\fancyhead[C]{\textcolor{pkfgray}{\small Guide CMAS/PWS v1.0}}
+\fancyhead[R]{\textcolor{pkfblue}{\thepage}}
+\fancyfoot[C]{\textcolor{pkfgray}{\small Cameroun — Octobre 2026}}
+\renewcommand{\headrulewidth}{2pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{pkforange}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.5pt}
+\renewcommand{\footrule}{\hbox to\headwidth{\color{codeframe}\leaders\hrule height \footrulewidth\hfill}}
+
+% ============================================================================
+% BOÎTES PERSONNALISÉES
+% ============================================================================
+\tcbuselibrary{skins,breakable}
+
+% Boîte pour les commandes
+\newtcolorbox{cmdbox}[1][]{
+    enhanced,
+    colback=codebg,
+    colframe=pkfblue,
+    coltitle=white,
+    fonttitle=\bfseries\small,
+    title=#1,
+    boxrule=1pt,
+    arc=2pt,
+    left=5pt,
+    right=5pt,
+    top=5pt,
+    bottom=5pt,
+    breakable
+}
+
+% Boîte pour les avertissements
+\newtcolorbox{warnbox}{
+    enhanced,
+    colback=warningyellow!15,
+    colframe=pkforange,
+    coltitle=white,
+    fonttitle=\bfseries\small,
+    title={\faExclamationTriangle\ \ Important},
+    boxrule=1pt,
+    arc=2pt,
+    left=5pt,
+    right=5pt,
+    breakable
+}
+
+% Boîte pour les succès
+\newtcolorbox{successbox}{
+    enhanced,
+    colback=successgreen!10,
+    colframe=successgreen,
+    coltitle=white,
+    fonttitle=\bfseries\small,
+    title={\faCheckCircle\ \ Vérification},
+    boxrule=1pt,
+    arc=2pt,
+    left=5pt,
+    right=5pt,
+    breakable
+}
+
+% Boîte pour les erreurs
+\newtcolorbox{errorbox}{
+    enhanced,
+    colback=dangered!10,
+    colframe=dangered,
+    coltitle=white,
+    fonttitle=\bfseries\small,
+    title={\faTimesCircle\ \ Attention},
+    boxrule=1pt,
+    arc=2pt,
+    left=5pt,
+    right=5pt,
+    breakable
+}
+
+% Boîte pour les fichiers
+\newtcolorbox{filebox}[1][]{
+    enhanced,
+    colback=codebg,
+    colframe=pkfgray,
+    coltitle=white,
+    fonttitle=\bfseries\ttfamily\small,
+    title={\faFile\ \ #1},
+    boxrule=1pt,
+    arc=2pt,
+    left=0pt,
+    right=0pt,
+    top=0pt,
+    bottom=0pt,
+    breakable
+}
+
+% ============================================================================
+% COMMANDES PERSONNALISÉES
+% ============================================================================
+\newcommand{\ip}[1]{\texttt{\color{pkfblue}#1}}
+\newcommand{\port}[1]{\texttt{\color{pkforange}#1}}
+\newcommand{\cmd}[1]{\texttt{\color{pkfgray}#1}}
+\newcommand{\file}[1]{\texttt{\color{successgreen}#1}}
+
+% ============================================================================
+% DÉBUT DU DOCUMENT
+% ============================================================================
+\begin{document}
+
+% ============================================================================
+% PAGE DE TITRE
+% ============================================================================
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    % Logo/Titre
+    {\fontsize{50}{60}\selectfont\textcolor{pkfblue}{\textbf{PKF}}}\\[0.2cm]
+    {\fontsize{30}{36}\selectfont\textcolor{pkforange}{\textbf{Telco}}}\\[1.5cm]
+    
+    % Ligne décorative
+    {\color{pkforange}\rule{0.6\textwidth}{3pt}}\\[1.5cm]
+    
+    % Titre principal
+    {\Huge\bfseries\textcolor{pkfblue}{Guide d'Installation}}\\[0.5cm]
+    {\Huge\bfseries\textcolor{pkfblue}{Système CMAS/PWS}}\\[1cm]
+    
+    {\Large\textcolor{pkfgray}{Cell Broadcast Emergency Alerts}}\\[0.3cm]
+    {\Large\textcolor{pkfgray}{pour Réseau LTE Privé}}\\[2cm]
+    
+    % Technologies
+    \begin{tcolorbox}[
+        enhanced,
+        colback=codebg,
+        colframe=pkfblue,
+        width=0.7\textwidth,
+        arc=5pt,
+        boxrule=1pt
+    ]
+        \centering
+        \textbf{Stack Technique}\\[0.3cm]
+        \textcolor{pkfblue}{Open5GS} + \textcolor{pkforange}{srsRAN 4G} + \textcolor{successgreen}{osmo-cbc}
+    \end{tcolorbox}
+    
+    \vfill
+    
+    % Informations
+    \begin{tabular}{rl}
+        \textcolor{pkfgray}{\textbf{Version}} & 1.0 \\[0.2cm]
+        \textcolor{pkfgray}{\textbf{Date}} & Octobre 2026 \\[0.2cm]
+        \textcolor{pkfgray}{\textbf{Auteur}} & Arnaud DJOUM \\[0.2cm]
+        \textcolor{pkfgray}{\textbf{Organisation}} & F2G / PKF Telco \\
+    \end{tabular}
+    
+    \vspace{1cm}
+    
+    % Ligne décorative bas
+    {\color{pkforange}\rule{0.8\textwidth}{2pt}}
+    
+\end{titlepage}
+
+% ============================================================================
+% TABLE DES MATIÈRES
+% ============================================================================
+\tableofcontents
+\newpage
+
+% ============================================================================
+% SECTION 1: INTRODUCTION
+% ============================================================================
+\section{Introduction}
+
+Ce document décrit l'installation complète d'un système d'alertes d'urgence \textbf{CMAS} (Commercial Mobile Alert System) / \textbf{PWS} (Public Warning System) sur un réseau LTE privé PKF Telco.
+
+\subsection{Architecture du système}
+
+\begin{center}
+\begin{tabular}{|>{\columncolor{pkfblue!10}}l|l|l|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Composant}} & \textcolor{white}{\textbf{Rôle}} & \textcolor{white}{\textbf{Interface}} \\
+\hline
+osmo-cbc & Cell Broadcast Centre & REST API + SBc-AP \\
+\hline
+Open5GS MME & Mobility Management Entity & SBc-AP + S1AP \\
+\hline
+srsRAN eNB & Station de base & S1AP + Air (SIB12) \\
+\hline
+UE & Téléphone mobile & Interface radio \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Flux des alertes}
+
+\begin{center}
+\begin{tcolorbox}[
+    enhanced,
+    colback=codebg,
+    colframe=pkfblue,
+    width=0.9\textwidth,
+    arc=3pt
+]
+\centering
+\texttt{API REST} $\rightarrow$ \textbf{osmo-cbc} $\xrightarrow{\text{SBc-AP}}$ \textbf{MME} $\xrightarrow{\text{S1AP}}$ \textbf{eNB} $\xrightarrow{\text{SIB12}}$ \textbf{UE}
+\end{tcolorbox}
+\end{center}
+
+\subsection{Prérequis matériels et logiciels}
+
+\begin{itemize}[leftmargin=2cm]
+    \item[\faServer] Ubuntu 22.04 LTS (ou supérieur)
+    \item[\faDocker] Docker et Docker Compose
+    \item[\faBroadcastTower] bladeRF xA4 (ou SDR compatible srsRAN)
+    \item[\faSimCard] Carte SIM programmable (sysmoISIM-SJA2)
+    \item[\faCode] Git, CMake, GCC, build-essential
+\end{itemize}
+
+\subsection{Adresses IP du déploiement}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Composant}} & \textcolor{white}{\textbf{Adresse IP}} & \textcolor{white}{\textbf{Port}} \\
+\hline
+MongoDB & \ip{172.22.0.2} & \port{27017} \\
+\hline
+HSS & \ip{172.22.0.3} & \port{3868} (Diameter) \\
+\hline
+SGW-C & \ip{172.22.0.5} & \port{2123} (GTP-C) \\
+\hline
+SGW-U & \ip{172.22.0.6} & \port{2152} (GTP-U) \\
+\hline
+SMF & \ip{172.22.0.7} & \port{2123} \\
+\hline
+UPF & \ip{172.22.0.8} & \port{2152} \\
+\hline
+MME (GTP) & \ip{172.22.0.1} & \port{2123} \\
+\hline
+MME (S1AP) & \ip{127.0.0.2} & \port{36412} \\
+\hline
+MME (SBc-AP) & \ip{127.0.0.2} & \port{29168} \\
+\hline
+osmo-cbc (API) & \ip{127.0.0.1} & \port{12345} \\
+\hline
+osmo-cbc (SBc-AP) & \ip{127.0.0.10} & \port{29169} \\
+\hline
+eNB (S1-C) & \ip{127.0.1.1} & - \\
+\hline
+\end{tabular}
+\end{center}
+
+\newpage
+
+% ============================================================================
+% SECTION 2: INSTALLATION OPEN5GS
+% ============================================================================
+\section{Installation Open5GS avec SBc-AP}
+
+\begin{warnbox}
+La version standard d'Open5GS ne supporte pas l'interface SBc-AP. Il faut compiler depuis la Pull Request \#4864 qui ajoute ce support.
+\end{warnbox}
+
+\subsection{Clonage du code source}
+
+\begin{cmdbox}[Étape 2.1 — Clonage du repository]
+\begin{lstlisting}[style=bashstyle]
+# Créer le répertoire de travail
+mkdir -p /home/f2g/Desktop
+cd /home/f2g/Desktop
+
+# Cloner Open5GS
+git clone https://github.com/open5gs/open5gs.git open5gs-fork
+cd open5gs-fork
+
+# Récupérer la branche SBc-AP (PR #4864)
+git fetch origin pull/4864/head:sbcap-branch
+git checkout sbcap-branch
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Installation des dépendances}
+
+\begin{cmdbox}[Étape 2.2 — Dépendances système]
+\begin{lstlisting}[style=bashstyle]
+sudo apt update
+sudo apt install -y \
+    meson ninja-build flex bison \
+    libsctp-dev libgnutls28-dev libgcrypt-dev \
+    libssl-dev libidn11-dev libmongoc-dev \
+    libbson-dev libyaml-dev libnghttp2-dev \
+    libmicrohttpd-dev libcurl4-gnutls-dev \
+    libjansson-dev libtalloc-dev libtins-dev
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Compilation et installation}
+
+\begin{cmdbox}[Étape 2.3 — Compilation]
+\begin{lstlisting}[style=bashstyle]
+cd /home/f2g/Desktop/open5gs-fork
+
+# Configuration avec Meson
+meson build --prefix=/usr/local
+
+# Compilation
+ninja -C build
+
+# Installation (nécessite sudo)
+sudo ninja -C build install
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification de l'installation}
+
+\begin{successbox}
+\begin{lstlisting}[style=bashstyle]
+# Vérifier que le binaire MME supporte SBc-AP
+strings /usr/local/bin/open5gs-mmed | grep -i sbcap
+
+# Résultat attendu:
+# sbcap_server
+# SBCAP accepted
+# SBc-AP
+\end{lstlisting}
+\end{successbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 3: INSTALLATION OSMO-CBC
+% ============================================================================
+\section{Installation osmo-cbc}
+
+osmo-cbc est le Cell Broadcast Centre développé par Osmocom. Il gère les messages d'alerte et communique avec le MME via SBc-AP.
+
+\subsection{Installation des dépendances Osmocom}
+
+\begin{cmdbox}[Étape 3.1 — Dépendances Osmocom]
+\begin{lstlisting}[style=bashstyle]
+sudo apt install -y \
+    libosmocore-dev libosmo-netif-dev \
+    libosmo-sigtran-dev libulfius-dev \
+    libjansson-dev autoconf automake libtool
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Compilation depuis les sources}
+
+\begin{cmdbox}[Étape 3.2 — Compilation osmo-cbc]
+\begin{lstlisting}[style=bashstyle]
+cd /home/f2g
+git clone https://gitea.osmocom.org/cellular-infrastructure/osmo-cbc
+cd osmo-cbc
+
+# Génération des scripts de configuration
+autoreconf -fi
+
+# Configuration
+./configure --prefix=/usr/local
+
+# Compilation
+make -j$(nproc)
+
+# Installation
+sudo make install
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification}
+
+\begin{successbox}
+\begin{lstlisting}[style=bashstyle]
+# Vérifier l'installation
+which osmo-cbc
+# /usr/local/bin/osmo-cbc
+
+osmo-cbc --version
+\end{lstlisting}
+\end{successbox}
+
+\begin{warnbox}
+Si vous avez un binaire patché pour la gestion de l'expiration des alertes, utilisez:
+\texttt{/usr/bin/osmo-cbc-patched}
+\end{warnbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 4: INSTALLATION SRSRAN
+% ============================================================================
+\section{Installation srsRAN avec support PWS/CMAS}
+
+\begin{errorbox}
+La version standard de srsRAN 4G \textbf{ne génère pas} le SIB12 pour les alertes CMAS. Le code affiche uniquement \texttt{"would generate SIB12"} sans réellement le diffuser. Il faut utiliser la branche \texttt{pws-cmas-support} et s'assurer que le code génère réellement le SIB12.
+\end{errorbox}
+
+\subsection{Clonage et sélection de la branche}
+
+\begin{cmdbox}[Étape 4.1 — Clonage srsRAN]
+\begin{lstlisting}[style=bashstyle]
+mkdir -p /home/f2g/build
+cd /home/f2g/build
+
+git clone https://github.com/srsran/srsRAN_4G.git
+cd srsRAN_4G
+
+# Checkout de la branche PWS
+git checkout pws-cmas-support
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification du code source}
+
+\begin{warnbox}
+Avant de compiler, vérifiez que le fichier \file{srsenb/src/stack/rrc/rrc.cc} contient bien:
+\begin{center}
+\texttt{logger.info("PWS: CMAS warning - generating SIB12 for broadcast");}
+\end{center}
+Et \textbf{PAS}:
+\begin{center}
+\texttt{logger.info("PWS: CMAS warning - would generate SIB12");}
+\end{center}
+\end{warnbox}
+
+\begin{cmdbox}[Étape 4.2 — Vérification du code]
+\begin{lstlisting}[style=bashstyle]
+grep -n "generating SIB12\|would generate" \
+    /home/f2g/build/srsRAN_4G/srsenb/src/stack/rrc/rrc.cc
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Installation des dépendances}
+
+\begin{cmdbox}[Étape 4.3 — Dépendances srsRAN]
+\begin{lstlisting}[style=bashstyle]
+sudo apt install -y \
+    cmake libfftw3-dev libmbedtls-dev \
+    libboost-program-options-dev libconfig++-dev \
+    libsctp-dev libuhd-dev libbladerf-dev \
+    libsoapysdr-dev
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Compilation}
+
+\begin{cmdbox}[Étape 4.4 — Compilation srsRAN]
+\begin{lstlisting}[style=bashstyle]
+cd /home/f2g/build/srsRAN_4G
+mkdir -p build && cd build
+
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+sudo make install
+sudo ldconfig
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification du binaire}
+
+\begin{successbox}
+\begin{lstlisting}[style=bashstyle]
+# Vérifier que le binaire génère bien SIB12
+strings $(which srsenb) | grep "generating SIB12"
+
+# Résultat attendu:
+# PWS: CMAS warning - generating SIB12 for broadcast
+\end{lstlisting}
+\end{successbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 5: CONFIGURATION DOCKER
+% ============================================================================
+\section{Configuration du Core Network Docker}
+
+Le cœur de réseau (HSS, SGW, SMF, UPF) fonctionne dans des conteneurs Docker.
+
+\subsection{Structure des conteneurs}
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Conteneur}} & \textcolor{white}{\textbf{IP}} & \textcolor{white}{\textbf{Rôle}} & \textcolor{white}{\textbf{Interface}} \\
+\hline
+mongo & \ip{172.22.0.2} & Base de données & MongoDB \\
+\hline
+hss & \ip{172.22.0.3} & Home Subscriber Server & Diameter S6a \\
+\hline
+sgwc & \ip{172.22.0.5} & SGW Control Plane & GTP-C \\
+\hline
+sgwu & \ip{172.22.0.6} & SGW User Plane & GTP-U \\
+\hline
+smf & \ip{172.22.0.7} & Session Management & GTP-C \\
+\hline
+upf & \ip{172.22.0.8} & User Plane Function & GTP-U \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Démarrage des conteneurs}
+
+\begin{cmdbox}[Étape 5.1 — Démarrage Docker]
+\begin{lstlisting}[style=bashstyle]
+cd /home/f2g/docker_open5gs
+
+# Démarrer les conteneurs nécessaires
+docker-compose up -d mongo hss sgwc sgwu smf upf
+
+# Vérifier le statut
+docker-compose ps
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification de la connectivité}
+
+\begin{successbox}
+\begin{lstlisting}[style=bashstyle]
+# Vérifier que le HSS est accessible
+ping -c 2 172.22.0.3
+
+# Vérifier que le SGW-C est accessible
+ping -c 2 172.22.0.5
+\end{lstlisting}
+\end{successbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 6: CONFIGURATION MME
+% ============================================================================
+\section{Configuration du MME avec SBc-AP}
+
+\subsection{Création de la structure de répertoires}
+
+\begin{cmdbox}[Étape 6.1 — Création des répertoires]
+\begin{lstlisting}[style=bashstyle]
+mkdir -p /tmp/f2g_cmas/{mme,cbc,enb1,certs}
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Fichier de configuration MME}
+
+\begin{filebox}[/tmp/f2g\_cmas/mme/mme-sbcap.yaml]
+\begin{lstlisting}[style=yamlstyle]
+logger:
+  file:
+    path: /tmp/f2g_cmas/mme.log
+  level: info
+  domain: mme,sbcap,s1ap,sbc
+
+mme:
+  freeDiameter: /tmp/mme-fork-fd.conf
+  s1ap:
+    server:
+      - address: 127.0.0.2
+        port: 36412
+      - address: 192.168.1.100
+        port: 36412
+  sbcap:
+    server:
+      - address: 127.0.0.2
+        port: 29168
+  gtpc:
+    server:
+      - address: 172.22.0.1
+    client:
+      sgwc:
+        - address: 172.22.0.5
+      smf:
+        - address: 172.22.0.7
+  gummei:
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      mme_gid: 2
+      mme_code: 1
+  tai:
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      tac: 1
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      tac: 2
+  security:
+    integrity_order: [EIA2, EIA1, EIA0]
+    ciphering_order: [EEA0, EEA1, EEA2]
+  network_name:
+    full: PKF Telco
+  mme_name: mme-pkf-cmas
+\end{lstlisting}
+\end{filebox}
+
+\newpage
+
+\subsection{Configuration freeDiameter}
+
+\begin{filebox}[/tmp/mme-fork-fd.conf]
+\begin{lstlisting}[style=confstyle]
+Identity = "mme.epc.mnc001.mcc001.3gppnetwork.org";
+Realm = "epc.mnc001.mcc001.3gppnetwork.org";
+Port = 3868;
+SecPort = 5868;
+No_SCTP;
+
+ConnectPeer = "hss.epc.mnc001.mcc001.3gppnetwork.org" { 
+    ConnectTo = "172.22.0.3"; 
+    Port = 3868; 
+    No_TLS; 
+};
+
+LoadExtension = "/usr/local/lib/x86_64-linux-gnu/freeDiameter/dict_s6a.fdx";
+LoadExtension = "/usr/local/lib/x86_64-linux-gnu/freeDiameter/dict_nas_mipv6.fdx";
+\end{lstlisting}
+\end{filebox}
+
+\begin{warnbox}
+L'adresse IP \ip{172.22.0.1} pour \texttt{gtpc.server} est l'IP du bridge Docker. C'est \textbf{critique} pour que les conteneurs Docker puissent atteindre le MME.
+\end{warnbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 7: CONFIGURATION OSMO-CBC
+% ============================================================================
+\section{Configuration osmo-cbc}
+
+\begin{filebox}[/tmp/f2g\_cmas/cbc/osmo-cbc.cfg]
+\begin{lstlisting}[style=confstyle]
+log stderr
+ logging color 1
+ logging print category 1
+ logging timestamp 1
+ logging level all info
+ logging level sbcap debug
+ logging level rest debug
+
+cbc
+ unknown-peers reject
+ 
+ ecbe
+  local-ip 127.0.0.1
+  local-port 12345
+ 
+ sbcap
+  local-ip 127.0.0.10
+  local-port 29169
+ 
+ peer sbcap pkf-mme
+  mode client
+  remote-ip 127.0.0.2
+  remote-port 29168
+\end{lstlisting}
+\end{filebox}
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Paramètre}} & \textcolor{white}{\textbf{Description}} \\
+\hline
+\texttt{ecbe.local-port} & Port de l'API REST (12345) \\
+\hline
+\texttt{sbcap.local-ip} & IP locale pour SBc-AP \\
+\hline
+\texttt{peer.remote-ip} & IP du MME \\
+\hline
+\texttt{peer.remote-port} & Port SBc-AP du MME (29168) \\
+\hline
+\end{tabular}
+\end{center}
+
+\newpage
+
+% ============================================================================
+% SECTION 8: CONFIGURATION ENB
+% ============================================================================
+\section{Configuration eNB (srsRAN)}
+
+\subsection{Configuration principale}
+
+\begin{filebox}[/tmp/f2g\_cmas/enb1/enb.conf]
+\begin{lstlisting}[style=confstyle]
+[enb]
+enb_id = 0x19B01
+mcc = 001
+mnc = 01
+mme_addr = 127.0.0.2
+gtp_bind_addr = 172.22.0.1
+s1c_bind_addr = 127.0.1.1
+s1c_bind_port = 0
+n_prb = 50
+
+[enb_files]
+sib_config = /tmp/f2g_cmas/sib_pws.conf
+rr_config = /home/f2g/.config/srsran/rr.conf
+rb_config = /home/f2g/.config/srsran/rb.conf
+
+[rf]
+device_name = bladeRF
+device_args = auto
+time_adv_nsamples = auto
+tx_gain = 60
+rx_gain = 40
+
+[log]
+filename = /tmp/f2g_cmas/enb1.log
+all_level = info
+phy_level = warning
+\end{lstlisting}
+\end{filebox}
+
+\newpage
+
+\subsection{Configuration SIB avec SIB12}
+
+\begin{errorbox}
+Le \textbf{SIB12 DOIT} être déclaré dans \texttt{si\_mapping\_info = [ 12 ]} pour que l'eNB puisse diffuser les alertes CMAS. Sans cette configuration, les alertes sont ignorées.
+\end{errorbox}
+
+\begin{filebox}[/tmp/f2g\_cmas/sib\_pws.conf]
+\begin{lstlisting}[style=confstyle]
+sib1 =
+{
+    intra_freq_reselection = "Allowed";
+    q_rx_lev_min = -65;
+    cell_barred = "NotBarred"
+    si_window_length = 20;
+    sched_info =
+    (
+        {
+            si_periodicity = 16;
+            si_mapping_info = [ 3 ];
+        },
+        {
+            si_periodicity = 64;
+            si_mapping_info = [ 12 ];  // CRITIQUE: SIB12 pour CMAS
+        }
+    );
+    system_info_value_tag = 11;
+};
+
+sib2 = 
+{
+    rr_config_common_sib =
+    {
+        rach_cnfg = { 
+            num_ra_preambles = 52; 
+            preamble_init_rx_target_pwr = -104;
+            pwr_ramping_step = 6;
+            preamble_trans_max = 10;
+            ra_resp_win_size = 10;
+            mac_con_res_timer = 64;
+            max_harq_msg3_tx = 4;
+        };
+        bcch_cnfg = { modification_period_coeff = 16; };
+        pcch_cnfg = { default_paging_cycle = 32; nB = "1"; };
+        prach_cnfg = { 
+            root_sequence_index = 128;
+            prach_cnfg_info = {
+                high_speed_flag = false;
+                prach_config_index = 3;
+                prach_freq_offset = 4;
+                zero_correlation_zone_config = 5;
+            };
+        };
+        pdsch_cnfg = { p_b = 1; rs_power = 0; };
+        pusch_cnfg = { 
+            n_sb = 1;
+            hopping_mode = "inter-subframe";
+            pusch_hopping_offset = 2;
+            enable_64_qam = false;
+            ul_rs = {
+                cyclic_shift = 0;
+                group_assignment_pusch = 0;
+                group_hopping_enabled = false;
+                sequence_hopping_enabled = false;
+            };
+        };
+        pucch_cnfg = { 
+            delta_pucch_shift = 1;
+            n_rb_cqi = 1;
+            n_cs_an = 0;
+            n1_pucch_an = 12;
+        };
+        ul_pwr_ctrl = { 
+            p0_nominal_pusch = -85;
+            alpha = 0.7;
+            p0_nominal_pucch = -107;
+            delta_flist_pucch = {
+                format_1 = 0; format_1b = 3;
+                format_2 = 1; format_2a = 2; format_2b = 2;
+            };
+            delta_preamble_msg3 = 6;
+        };
+        ul_cp_length = "len1";
+    };
+    ue_timers_and_constants = {
+        t300 = 2000; t301 = 100; t310 = 200;
+        n310 = 1; t311 = 10000; n311 = 1;
+    };
+    freqInfo = {
+        ul_carrier_freq_present = true;
+        ul_bw_present = true;
+        additional_spectrum_emission = 1;
+    };
+    time_alignment_timer = "INFINITY";
+};
+
+sib3 =
+{
+    q_hyst = 2;
+    threshServingLow = 2;
+};
+\end{lstlisting}
+\end{filebox}
+
+\newpage
+
+% ============================================================================
+% SECTION 9: SCRIPT D'ALERTES
+% ============================================================================
+\section{Script d'envoi d'alertes}
+
+\begin{filebox}[/tmp/alert.sh]
+\begin{lstlisting}[style=bashstyle]
+#!/bin/bash
+# Script d'envoi d'alertes CMAS pour PKF Telco
+CBC_API="http://127.0.0.1:12345/api/v1"
+
+case "$1" in
+  send)
+    MSG="$2"
+    MSG_ID="${3:-4370}"
+    DURATION="${4:-60}"
+    SCOPE="${5:-tac:1}"
+    
+    CODE=$((RANDOM % 100 + 1))
+    NAME="alert${MSG_ID}c${CODE}"
+    EXPIRE=$((DURATION + 5))
+    
+    echo "Sending: $NAME (msg_id=$MSG_ID, code=$CODE)"
+    echo "Duration: ${DURATION}s - Expiration: ${EXPIRE}s"
+    echo "Scope: $SCOPE"
+    
+    MSG_HEX=$(echo -n "$MSG" | xxd -p | tr -d '\n')
+    
+    if [[ "$SCOPE" == tac:* ]]; then
+      TAC="${SCOPE#tac:}"
+      SCOPE_JSON="\"scope_tai\": {\"tai\": [{\"plmn\": \"00101\", \"tac\": $TAC}]}"
+    else
+      SCOPE_JSON="\"scope_plmn\": {\"plmn\": \"00101\"}"
+    fi
+    
+    RESULT=$(curl -s -X POST "$CBC_API/message" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"cbe_name\": \"$NAME\",
+        \"category\": \"cmas\",
+        \"repetition_period\": 5,
+        \"num_of_bcast\": $((DURATION / 5)),
+        \"dcs\": 15,
+        \"msg_id\": $MSG_ID,
+        \"payload_encoded\": \"$MSG_HEX\",
+        $SCOPE_JSON
+      }" 2>&1)
+    
+    if echo "$RESULT" | grep -qi "201\|Created\|success"; then
+      echo "Result: Created"
+    else
+      echo "Result: $RESULT"
+    fi
+    ;;
+    
+  stop)
+    MSG_ID="${2:-4370}"
+    echo "Stopping msg_id=$MSG_ID..."
+    curl -s -X DELETE "$CBC_API/message/$MSG_ID"
+    echo "Done"
+    ;;
+    
+  list)
+    echo "Active messages:"
+    curl -s "$CBC_API/message" | python3 -m json.tool 2>/dev/null || echo "None"
+    ;;
+    
+  *)
+    echo "Usage: $0 {send|stop|list}"
+    echo "  send \"message\" [msg_id] [duration_sec] [tac:N]"
+    echo "  stop [msg_id]"
+    echo "  list"
+    ;;
+esac
+\end{lstlisting}
+\end{filebox}
+
+\begin{cmdbox}[Rendre le script exécutable]
+\begin{lstlisting}[style=bashstyle]
+chmod +x /tmp/alert.sh
+\end{lstlisting}
+\end{cmdbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 10: DÉMARRAGE
+% ============================================================================
+\section{Démarrage du système}
+
+\subsection{Ordre de démarrage}
+
+\begin{center}
+\begin{tabular}{|c|l|l|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Étape}} & \textcolor{white}{\textbf{Composant}} & \textcolor{white}{\textbf{Dépendances}} \\
+\hline
+1 & Docker (HSS, SGW, SMF, UPF) & - \\
+\hline
+2 & MME Open5GS & Docker \\
+\hline
+3 & osmo-cbc & MME \\
+\hline
+4 & eNB srsRAN & MME, bladeRF \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{Commandes de démarrage}
+
+\begin{cmdbox}[Étape 10.1 — Démarrage Docker]
+\begin{lstlisting}[style=bashstyle]
+cd /home/f2g/docker_open5gs
+docker-compose up -d mongo hss sgwc sgwu smf upf
+\end{lstlisting}
+\end{cmdbox}
+
+\begin{cmdbox}[Étape 10.2 — Démarrage MME]
+\begin{lstlisting}[style=bashstyle]
+/usr/local/bin/open5gs-mmed -c /tmp/f2g_cmas/mme/mme-sbcap.yaml &
+\end{lstlisting}
+\end{cmdbox}
+
+\begin{cmdbox}[Étape 10.3 — Démarrage osmo-cbc]
+\begin{lstlisting}[style=bashstyle]
+cd /tmp/f2g_cmas/cbc
+/usr/bin/osmo-cbc-patched -c osmo-cbc.cfg &
+# ou: /usr/local/bin/osmo-cbc -c osmo-cbc.cfg &
+\end{lstlisting}
+\end{cmdbox}
+
+\begin{cmdbox}[Étape 10.4 — Démarrage eNB]
+\begin{lstlisting}[style=bashstyle]
+cd /tmp/f2g_cmas/enb1
+sudo srsenb enb.conf &
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification des connexions}
+
+\begin{successbox}
+\begin{lstlisting}[style=bashstyle]
+# Vérifier les logs MME
+grep -E "CONNECTED|SBC/CBC|Number of eNBs" /tmp/f2g_cmas/mme.log
+
+# Résultat attendu:
+# CONNECTED TO 'hss.epc.mnc001.mcc001.3gppnetwork.org'
+# SBC/CBC accepted[127.0.0.10]
+# [Added] Number of eNBs is now 1
+\end{lstlisting}
+\end{successbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 11: UTILISATION
+% ============================================================================
+\section{Envoi d'alertes}
+
+\subsection{Exemples d'utilisation}
+
+\begin{cmdbox}[Envoyer une alerte sur TAC 1]
+\begin{lstlisting}[style=bashstyle]
+/tmp/alert.sh send "URGENCE INONDATION DOUALA" 4370 60 tac:1
+\end{lstlisting}
+\end{cmdbox}
+
+\begin{cmdbox}[Envoyer une alerte sur TAC 2]
+\begin{lstlisting}[style=bashstyle]
+/tmp/alert.sh send "ALERTE SEISME YAOUNDE" 4370 120 tac:2
+\end{lstlisting}
+\end{cmdbox}
+
+\begin{cmdbox}[Lister les alertes actives]
+\begin{lstlisting}[style=bashstyle]
+/tmp/alert.sh list
+\end{lstlisting}
+\end{cmdbox}
+
+\begin{cmdbox}[Stopper une alerte]
+\begin{lstlisting}[style=bashstyle]
+/tmp/alert.sh stop 4370
+\end{lstlisting}
+\end{cmdbox}
+
+\subsection{Vérification de la diffusion}
+
+\begin{successbox}
+\begin{lstlisting}[style=bashstyle]
+# Vérifier les logs eNB pour la diffusion SIB12
+grep -iE "PWS|SIB12|CMAS" /tmp/f2g_cmas/enb1.log | tail -10
+
+# Résultat attendu:
+# PWS WriteReplaceWarning: msg_id=0x1112, serial=0x4120, CMAS
+# PWS: CMAS warning - generating SIB12 for broadcast
+# PWS: SIB12 cc=0 SI#2 segment 1/1 written (96 bytes)
+# PWS paging: cmas indication scheduled in 32 paging occasions
+# PWS: CMAS Alert Broadcast - msg_id=0x1112 serial=0x4120
+\end{lstlisting}
+\end{successbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 12: DÉPANNAGE
+% ============================================================================
+\section{Dépannage}
+
+\subsection{Problèmes courants et solutions}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{|l|l|X|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Symptôme}} & \textcolor{white}{\textbf{Cause}} & \textcolor{white}{\textbf{Solution}} \\
+\hline
+"Could not allocate" & Alerte précédente active & \cmd{/tmp/alert.sh stop 4370} ou redémarrer osmo-cbc \\
+\hline
+"would generate SIB12" & Binaire non à jour & Recompiler srsRAN avec la branche pws-cmas-support \\
+\hline
+UE ne s'attache pas & GTP IP incorrecte & Utiliser \ip{172.22.0.1} pour gtpc.server \\
+\hline
+HSS non connecté & Mauvaise IP/realm & Vérifier \file{/tmp/mme-fork-fd.conf} \\
+\hline
+eNB ne démarre pas & bladeRF non détecté & Débrancher/rebrancher USB \\
+\hline
+SIB12 non diffusé & SIB12 non configuré & Ajouter \texttt{si\_mapping\_info = [ 12 ]} dans sib.conf \\
+\hline
+\end{tabularx}
+\end{center}
+
+\subsection{Commandes de diagnostic}
+
+\begin{cmdbox}[Diagnostic système]
+\begin{lstlisting}[style=bashstyle]
+# État du bladeRF
+bladeRF-cli -e "version"
+
+# Logs MME en temps réel
+tail -f /tmp/f2g_cmas/mme.log | grep -E "Attach|IMSI|Bearer"
+
+# Logs eNB en temps réel
+tail -f /tmp/f2g_cmas/enb1.log | grep -iE "PWS|SIB12"
+
+# Processus actifs
+pgrep -a "open5gs-mmed\|osmo-cbc\|srsenb"
+
+# Connexions réseau
+netstat -an | grep -E "29168|36412|12345"
+\end{lstlisting}
+\end{cmdbox}
+
+\newpage
+
+% ============================================================================
+% SECTION 13: RÉFÉRENCES
+% ============================================================================
+\section{Références}
+
+\subsection{Spécifications 3GPP}
+
+\begin{itemize}[leftmargin=2cm]
+    \item[\faBook] \textbf{3GPP TS 23.041} — Technical realization of Cell Broadcast Service (CBS)
+    \item[\faBook] \textbf{3GPP TS 29.168} — Cell Broadcast Centre interfaces (SBc-AP)
+    \item[\faBook] \textbf{3GPP TS 36.331} — E-UTRA RRC Protocol (SIB10/11/12)
+    \item[\faBook] \textbf{3GPP TS 36.413} — S1 Application Protocol (S1AP)
+\end{itemize}
+
+\subsection{Documentation des projets}
+
+\begin{itemize}[leftmargin=2cm]
+    \item[\faGithub] \textbf{Open5GS} — \url{https://open5gs.org/open5gs/docs/}
+    \item[\faGithub] \textbf{Open5GS PR \#4864} — SBc-AP Support
+    \item[\faGithub] \textbf{srsRAN 4G} — \url{https://docs.srsran.com/projects/4g}
+    \item[\faGithub] \textbf{osmo-cbc} — \url{https://osmocom.org/projects/osmo-cbc}
+\end{itemize}
+
+\subsection{Message Identifiers (3GPP TS 23.041)}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{pkfblue}
+\textcolor{white}{\textbf{Message ID}} & \textcolor{white}{\textbf{Type}} & \textcolor{white}{\textbf{Description}} \\
+\hline
+4370 (0x1112) & Presidential Alert & Alerte présidentielle \\
+\hline
+4371-4372 & Extreme Alert & Menace extrême \\
+\hline
+4373-4378 & Severe Alert & Menace sévère \\
+\hline
+4379-4392 & Amber Alert & Alerte enlèvement \\
+\hline
+4393-4394 & Public Safety & Sécurité publique \\
+\hline
+4395 & State/Local Test & Test local \\
+\hline
+\end{tabular}
+\end{center}
+
+\vfill
+
+% ============================================================================
+% PIED DE PAGE FINAL
+% ============================================================================
+\begin{center}
+{\color{pkforange}\rule{0.8\textwidth}{2pt}}\\[0.5cm]
+{\Large\textbf{\textcolor{pkfblue}{PKF Telco}}}\\[0.3cm]
+\textcolor{pkfgray}{Cameroun — Système CMAS/PWS}\\[0.3cm]
+\textcolor{pkfgray}{Document généré le \today}\\[0.3cm]
+\textcolor{pkfgray}{\small Version 1.0 — Arnaud DJOUM / F2G}
+\end{center}
+
+\end{document}
