@@ -1,0 +1,104 @@
+#####################################################################
+# F2G Open5GS MME Configuration with SBc-AP Support
+#
+# This configuration enables the SBc-AP interface for receiving
+# PWS (Public Warning System) messages from a CBC (Cell Broadcast Centre).
+#
+# SBc-AP Port: 29168 (TS 29.168)
+# Protocol: SCTP
+#
+# Author: F2G TelcoLab
+# Date: 2026-10-13
+#####################################################################
+
+logger:
+  file: /var/log/open5gs/mme.log
+  level: debug  # Set to debug for SBc-AP troubleshooting
+
+global:
+  max:
+    ue: 1024
+
+mme:
+  freeDiameter: /usr/local/etc/freeDiameter/mme.conf
+  
+  # S1AP Server - Connection to eNBs
+  s1ap:
+    server:
+      - address: 127.0.0.2
+        port: 36412
+  
+  # SBc-AP Server - Connection from CBC
+  # This is the key addition for PWS support
+  sbcap:
+    server:
+      - address: 127.0.0.2
+        port: 29168
+  
+  # GTP-C for SGW/PGW communication
+  gtpc:
+    server:
+      - address: 127.0.0.2
+    client:
+      sgwc:
+        - address: 127.0.0.3
+      smf:
+        - address: 127.0.0.4
+
+  # Metrics endpoint
+  metrics:
+    server:
+      - address: 127.0.0.2
+        port: 9090
+
+  # GUMMEI (Globally Unique MME Identifier)
+  gummei:
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      mme_gid: 1
+      mme_code: 1
+
+  # TAI (Tracking Area Identity) - for F2G Multi-TAC
+  tai:
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      tac: [1, 2]  # TAC 1 = Yaoundé, TAC 2 = Douala
+
+  # Security algorithms
+  security:
+    integrity_order : [ EIA2, EIA1, EIA0 ]
+    ciphering_order : [ EEA0, EEA1, EEA2 ]
+
+  # Network name displayed on UE
+  network_name:
+    full: F2G TelcoLab
+    short: F2G
+
+  mme_name: f2g-mme-sbcap
+
+################################################################################
+# SBc-AP Configuration Notes
+################################################################################
+#
+# The SBc-AP interface allows a CBC to send Write-Replace-Warning-Request
+# messages to the MME, which then forwards them to matching eNBs via S1AP.
+#
+# Flow:
+#   CBC --[SBc-AP/SCTP:29168]--> MME --[S1AP]--> eNB --[RRC SIB]--> UE
+#
+# Testing:
+#   1. Start MME with this config
+#   2. Use cbc_simulator.py to send test alerts
+#   3. Monitor MME logs for SBc-AP messages
+#
+# Commands:
+#   # Check if MME is listening on SBc-AP port
+#   ss -tlnp | grep 29168
+#   
+#   # Send test alert
+#   python3 /home/f2g/Desktop/CMAS_Complete_Package/cbc-simulator/cbc_simulator.py \
+#     --mme-ip 127.0.0.2 --message "F2G Test Alert"
+#
+################################################################################

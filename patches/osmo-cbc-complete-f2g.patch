@@ -1,0 +1,289 @@
+diff --git a/include/osmocom/cbc/cbc_message.h b/include/osmocom/cbc/cbc_message.h
+index b42d0f2..f651b01 100644
+--- a/include/osmocom/cbc/cbc_message.h
++++ b/include/osmocom/cbc/cbc_message.h
+@@ -45,8 +45,18 @@ struct smscb_message {
+ 	};
+ };
+ 
++/* F2G: Maximum number of TAIs in a scope_tai list */
++#define CBC_MAX_TAI 16
++
++/* F2G: TAI (Tracking Area Identity) for scope_tai - 3GPP TS 29.168 */
++struct cbc_tai {
++	char plmn[7];	/* MCC+MNC as string, e.g. "00101" */
++	uint16_t tac;	/* Tracking Area Code */
++};
++
+ enum cbc_message_scope {
+ 	CBC_MSG_SCOPE_PLMN,
++	CBC_MSG_SCOPE_TAI,	/* F2G: List of TAIs (3GPP TS 29.168) */
+ 	/* FIXME: more local/regional scopes than PLMN-wide */
+ };
+ 
+@@ -80,7 +90,11 @@ struct cbc_message {
+ 	uint16_t num_bcast;		/* number of broadcasts requested (0=unlimited) */
+ 
+ 	enum cbc_message_scope scope;
+-	/* FIXME: data for other scopes than PLMN-wide */
++	/* F2G: TAI list for CBC_MSG_SCOPE_TAI */
++	struct {
++		struct cbc_tai tai[CBC_MAX_TAI];
++		unsigned int num_tai;
++	} tai_list;
+ 
+ 	/* SMSCB message with id, serial, dcs, pages, ... */
+ 	struct smscb_message msg;
+diff --git a/src/cbc_message.c b/src/cbc_message.c
+index 463061b..5da25c1 100644
+--- a/src/cbc_message.c
++++ b/src/cbc_message.c
+@@ -45,6 +45,9 @@ static bool is_peer_in_scope(const struct cbc_peer *peer, const struct cbc_messa
+ 	switch (cbcmsg->scope) {
+ 	case CBC_MSG_SCOPE_PLMN:
+ 		return true;
++	case CBC_MSG_SCOPE_TAI:
++		/* F2G: For TAI scope, send to all peers (MME will filter by TAC) */
++		return true;
+ 	/* FIXME: different scopes */
+ 	default:
+ 		OSMO_ASSERT(0);
+diff --git a/src/rest_api.c b/src/rest_api.c
+index 4d78cc7..4939271 100644
+--- a/src/rest_api.c
++++ b/src/rest_api.c
+@@ -525,10 +525,55 @@ static int json2cbc_message(struct cbc_message *out, void *ctx, json_t *in, cons
+ 		return -EINVAL;
+ 	}
+ 
+-	if ((jtmp = json_object_get(jtmp, "scope_plmn"))) {
++	/* F2G: Check for scope_tai first, then scope_plmn */
++	json_t *jtai = json_object_get(jtmp, "scope_tai");
++	json_t *jplmn = json_object_get(jtmp, "scope_plmn");
++	
++	if (jtai && json_is_object(jtai)) {
++		/* F2G: Parse scope_tai - List of TAIs (3GPP TS 29.168) */
++		out->scope = CBC_MSG_SCOPE_TAI;
++		out->tai_list.num_tai = 0;
++		
++		json_t *jtai_list = json_object_get(jtai, "tai_list");
++		if (jtai_list && json_is_array(jtai_list)) {
++			size_t idx;
++			json_t *jtai_entry;
++			json_array_foreach(jtai_list, idx, jtai_entry) {
++				if (out->tai_list.num_tai >= CBC_MAX_TAI) {
++					*errstr = "CBCMSG 'scope_tai' too many TAIs (max 16)";
++					return -EINVAL;
++				}
++				
++				const char *plmn = json_string_value(json_object_get(jtai_entry, "plmn"));
++				json_t *jtac = json_object_get(jtai_entry, "tac");
++				
++				if (!plmn || !jtac) {
++					*errstr = "CBCMSG 'scope_tai' entry missing plmn or tac";
++					return -EINVAL;
++				}
++				
++				struct cbc_tai *tai = &out->tai_list.tai[out->tai_list.num_tai];
++				strncpy(tai->plmn, plmn, sizeof(tai->plmn) - 1);
++				tai->plmn[sizeof(tai->plmn) - 1] = '\0';
++				tai->tac = json_integer_value(jtac);
++				out->tai_list.num_tai++;
++				
++				LOGP(DREST, LOGL_INFO, "scope_tai: PLMN=%s TAC=%u\n", tai->plmn, tai->tac);
++			}
++		} else {
++			*errstr = "CBCMSG 'scope_tai' requires 'tai_list' array";
++			return -EINVAL;
++		}
++		
++		if (out->tai_list.num_tai == 0) {
++			*errstr = "CBCMSG 'scope_tai' tai_list is empty";
++			return -EINVAL;
++		}
++		LOGP(DREST, LOGL_INFO, "Parsed scope_tai with %u TAI(s)\n", out->tai_list.num_tai);
++	} else if (jplmn) {
+ 		out->scope = CBC_MSG_SCOPE_PLMN;
+ 	} else {
+-		*errstr = "CBCMSG only 'scope_plmn' supported";
++		*errstr = "CBCMSG 'scope' must be 'scope_plmn' or 'scope_tai'";
+ 		return -EINVAL;
+ 	}
+ 
+diff --git a/src/sbcap_msg.c b/src/sbcap_msg.c
+index 64ba8b3..7b4c154 100644
+--- a/src/sbcap_msg.c
++++ b/src/sbcap_msg.c
+@@ -84,6 +84,17 @@ static void msgb_put_sbcap_cell_list(const struct cbc_message *cbcmsg, void *voi
+ /* generate a SBc-AP WRITE-REPLACE WARNING REQUEST from our internal representation.
+  * 3GPP TS 36.413 9.1.13.1
+  */
++/* F2G: Convert PLMN string to TBCD format for SBc-AP List-of-TAIs */
++static void plmn_str_to_tbcd(const char *plmn, uint8_t *out)
++{
++	int d[6] = {0}, n = (int)strlen(plmn), i;
++	for (i = 0; i < n && i < 6; i++)
++		d[i] = plmn[i] - '0';
++	out[0] = (uint8_t)((d[1] << 4) | d[0]);
++	out[1] = (uint8_t)(((n == 6 ? d[5] : 0xF) << 4) | d[2]);
++	out[2] = (uint8_t)((d[4] << 4) | d[3]);
++}
++
+ SBcAP_SBC_AP_PDU_t *sbcap_gen_write_replace_warning_req(void *ctx, const struct cbc_message *cbcmsg)
+ {
+ 	const struct smscb_message *smscb = &cbcmsg->msg;
+@@ -130,6 +141,28 @@ SBcAP_SBC_AP_PDU_t *sbcap_gen_write_replace_warning_req(void *ctx, const struct
+ 	switch (cbcmsg->scope) {
+ 	case CBC_MSG_SCOPE_PLMN:
+ 		break; /* Nothing to be done :*/
++	case CBC_MSG_SCOPE_TAI:
++		/* F2G: List of TAIs (3GPP TS 29.168)
++		 * static const long asn_VAL_3_SBcAP_id_List_of_TAIs = 14; */
++		{
++			unsigned int i;
++			ie = sbcap_alloc_Write_Replace_Warning_Request_IE(14, SBcAP_Criticality_ignore,
++				SBcAP_Write_Replace_Warning_Request_IEs__value_PR_List_of_TAIs);
++			for (i = 0; i < cbcmsg->tai_list.num_tai; i++) {
++				List_of_TAIs__Member *m = CALLOC(1, sizeof(*m));
++				/* PLMN in TBCD format */
++				m->tai.pLMNidentity.buf = MALLOC(3);
++				m->tai.pLMNidentity.size = 3;
++				plmn_str_to_tbcd(cbcmsg->tai_list.tai[i].plmn, m->tai.pLMNidentity.buf);
++				/* TAC as 2 octets */
++				m->tai.tAC.buf = MALLOC(2);
++				m->tai.tAC.size = 2;
++				osmo_store16be(cbcmsg->tai_list.tai[i].tac, m->tai.tAC.buf);
++				ASN_SEQUENCE_ADD(&ie->value.choice.List_of_TAIs.list, m);
++			}
++			ASN_SEQUENCE_ADD(as_pdu, ie);
++		}
++		break;
+ #if 0
+ 	case CBC_MSG_SCOPE_EUTRAN_CGI:
+ 		/* Warning Area List
+@@ -289,6 +322,25 @@ SBcAP_SBC_AP_PDU_t *sbcap_gen_stop_warning_req(void *ctx, const struct cbc_messa
+ 	switch (cbcmsg->scope) {
+ 	case CBC_MSG_SCOPE_PLMN:
+ 		break; /* Nothing to be done :*/
++	case CBC_MSG_SCOPE_TAI:
++		/* F2G: List of TAIs (3GPP TS 29.168) */
++		{
++			unsigned int i;
++			ie = sbcap_alloc_Stop_Warning_Request_IE(14, SBcAP_Criticality_ignore,
++				SBcAP_Stop_Warning_Request_IEs__value_PR_List_of_TAIs);
++			for (i = 0; i < cbcmsg->tai_list.num_tai; i++) {
++				List_of_TAIs__Member *m = CALLOC(1, sizeof(*m));
++				m->tai.pLMNidentity.buf = MALLOC(3);
++				m->tai.pLMNidentity.size = 3;
++				plmn_str_to_tbcd(cbcmsg->tai_list.tai[i].plmn, m->tai.pLMNidentity.buf);
++				m->tai.tAC.buf = MALLOC(2);
++				m->tai.tAC.size = 2;
++				osmo_store16be(cbcmsg->tai_list.tai[i].tac, m->tai.tAC.buf);
++				ASN_SEQUENCE_ADD(&ie->value.choice.List_of_TAIs.list, m);
++			}
++			ASN_SEQUENCE_ADD(as_pdu, ie);
++		}
++		break;
+ #if 0
+ 	case CBC_MSG_SCOPE_EUTRAN_CGI:
+ 		/* Warning Area List
+diff --git a/src/smscb_message_fsm.c b/src/smscb_message_fsm.c
+index e7f96c0..c106927 100644
+--- a/src/smscb_message_fsm.c
++++ b/src/smscb_message_fsm.c
+@@ -20,6 +20,12 @@
+  *
+  */
+ 
++/* 
++ * F2G TelcoLab Patch - 2026-10-13
++ * Added automatic message expiration based on num_bcast * rep_period
++ * Bug fix: Messages stayed "active" forever instead of expiring
++ */
++
+ #include <osmocom/core/utils.h>
+ #include <osmocom/core/linuxlist.h>
+ #include <osmocom/core/talloc.h>
+@@ -39,6 +45,9 @@
+ 
+ #define S(x)    (1 << (x))
+ 
++/* F2G: Timer for automatic message expiration */
++#define T_MSG_EXPIRATION 99
++
+ const struct value_string smscb_message_fsm_event_names[] = {
+ 	{ SMSCB_MSG_E_CHILD_DIED,	"CHILD_DIED" },
+ 	{ SMSCB_MSG_E_CREATE,		"CREATE" },
+@@ -56,6 +65,23 @@ const struct value_string smscb_message_fsm_event_names[] = {
+ 	{ 0, NULL }
+ };
+ 
++/* F2G: Calculate expiration timeout in seconds based on num_bcast and rep_period */
++static unsigned int calc_expiration_timeout(struct cbc_message *cbcmsg)
++{
++	unsigned int timeout_sec;
++	
++	/* If num_bcast is 0 (unlimited) or not set, don't set expiration timer */
++	if (cbcmsg->num_bcast == 0)
++		return 0;
++	
++	/* rep_period is the repetition period in seconds as provided by REST API */
++	/* timeout = num_bcast * rep_period */
++	timeout_sec = cbcmsg->num_bcast * cbcmsg->rep_period;
++	
++	/* Add 5 seconds margin for processing delays */
++	return timeout_sec + 5;
++}
++
+ static void smscb_fsm_init(struct osmo_fsm_inst *fi, uint32_t event, void *data)
+ {
+ 	struct cbc_message *cbcmsg = fi->priv;
+@@ -77,6 +103,7 @@ static void smscb_fsm_wait_write_ack(struct osmo_fsm_inst *fi, uint32_t event, v
+ {
+ 	struct cbc_message *cbcmsg = fi->priv;
+ 	struct osmo_fsm_inst *peer_fi;
++	unsigned int timeout_sec;
+ 
+ 	switch (event) {
+ 	case SMSCB_MSG_E_WRITE_ACK:
+@@ -88,7 +115,15 @@ static void smscb_fsm_wait_write_ack(struct osmo_fsm_inst *fi, uint32_t event, v
+ 				return;
+ 		}
+ 		rest_it_op_set_http_result(cbcmsg->it_op, 201, "Created"); // FIXME: error cases
+-		osmo_fsm_inst_state_chg(fi, SMSCB_S_ACTIVE, 0, 0);
++		
++		/* F2G: Start expiration timer based on num_bcast * rep_period */
++		timeout_sec = calc_expiration_timeout(cbcmsg);
++		if (timeout_sec > 0) {
++			LOGPFSML(fi, LOGL_INFO, "Starting expiration timer: %u seconds\n", timeout_sec);
++			osmo_fsm_inst_state_chg(fi, SMSCB_S_ACTIVE, timeout_sec, T_MSG_EXPIRATION);
++		} else {
++			osmo_fsm_inst_state_chg(fi, SMSCB_S_ACTIVE, 0, 0);
++		}
+ 		break;
+ 	default:
+ 		OSMO_ASSERT(0);
+@@ -257,7 +292,8 @@ static struct osmo_fsm_state smscb_fsm_states[] = {
+ 		.out_state_mask = S(SMSCB_S_ACTIVE) |
+ 				  S(SMSCB_S_WAIT_REPLACE_ACK) |
+ 				  S(SMSCB_S_WAIT_STATUS_ACK) |
+-				  S(SMSCB_S_WAIT_DELETE_ACK),
++				  S(SMSCB_S_WAIT_DELETE_ACK) |
++				  S(SMSCB_S_DELETED),  /* F2G: Allow transition to DELETED on expiration */
+ 		.action = smscb_fsm_active,
+ 	},
+ 	[SMSCB_S_WAIT_REPLACE_ACK] = {
+@@ -312,6 +348,13 @@ static int smscb_fsm_timer_cb(struct osmo_fsm_inst *fi)
+ 		/* onleave will take care of notifying the user */
+ 		osmo_fsm_inst_state_chg(fi, SMSCB_S_DELETED, 0, 0);
+ 		break;
++	/* F2G: Handle automatic expiration timer */
++	case T_MSG_EXPIRATION:
++		LOGPFSML(fi, LOGL_INFO, "Message expired - sending Stop-Warning\n");
++		/* F2G: Broadcast DELETE to all peers (sends Stop-Warning-Request) */
++		osmo_fsm_inst_broadcast_children(fi, SMSCB_PEER_E_DELETE, NULL);
++		osmo_fsm_inst_state_chg(fi, SMSCB_S_WAIT_DELETE_ACK, 10, T_WAIT_DELETE_ACK);
++		break;
+ 	default:
+ 		OSMO_ASSERT(0);
+ 	}

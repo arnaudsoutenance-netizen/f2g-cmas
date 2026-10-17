@@ -1,0 +1,47 @@
+logger:
+  file: /var/log/open5gs/mme.log
+
+global:
+  max:
+    ue: 1024
+
+mme:
+  freeDiameter: /etc/freeDiameter/mme.conf
+  s1ap:
+    server:
+      - address: 172.22.0.9
+        port: 36412
+  sbcap:
+    server:
+      - address: 172.22.0.9
+        port: 29168
+  gtpc:
+    server:
+      - address: 172.22.0.9
+    client:
+      sgwc:
+        - address: 172.22.0.6
+      smf:
+        - address: 172.22.0.4
+  metrics:
+    server:
+      - address: 172.22.0.9
+        port: 9091
+  gummei:
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      mme_gid: 1
+      mme_code: 1
+  tai:
+    - plmn_id:
+        mcc: 001
+        mnc: 01
+      tac: [1, 2, 3]
+  security:
+    integrity_order: [ EIA2, EIA1, EIA0 ]
+    ciphering_order: [ EEA0, EEA1, EEA2 ]
+  network_name:
+    full: F2G TelcoLab CMAS
+    short: F2G
+  mme_name: mme.cmas.f2g

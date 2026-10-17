@@ -1,0 +1,52 @@
+logger:
+    file:
+      path: /open5gs/install/var/log/open5gs/mme.log
+
+global:
+  max:
+    ue: MAX_NUM_UE
+
+mme:
+    freeDiameter: /open5gs/install/etc/freeDiameter/mme.conf
+    s1ap:
+      server:
+        - dev: MME_IF
+    gtpc:
+      server:
+        - dev: MME_IF
+      client:
+        sgwc:
+          - address: SGWC_IP
+        smf:
+          - address: SMF_IP
+    gummei: 
+      - plmn_id:
+          mcc: MCC
+          mnc: MNC
+        mme_gid: 2
+        mme_code: 1
+    tai:
+      - plmn_id:
+          mcc: MCC
+          mnc: MNC
+        tac: 1
+      - plmn_id:
+          mcc: MCC
+          mnc: MNC
+        tac: 2
+    security:
+        integrity_order : [ EIA2, EIA1, EIA0 ]
+        ciphering_order : [ EEA0, EEA1, EEA2 ]
+    network_name:
+        full: K48 Telecommunications
+        short: K48
+    mme_name: F2G-mme0
+    metrics:
+      server:
+        - address: MME_IP
+          port: 9091
+    time:
+      t3412:
+        value: 540
+    mme_features:
+      ims_voice_over_ps_sessions_in_s1_supported: true

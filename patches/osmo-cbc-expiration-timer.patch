@@ -1,0 +1,98 @@
+diff --git a/src/smscb_message_fsm.c b/src/smscb_message_fsm.c
+index e7f96c0..5f3746c 100644
+--- a/src/smscb_message_fsm.c
++++ b/src/smscb_message_fsm.c
+@@ -20,6 +20,12 @@
+  *
+  */
+ 
++/* 
++ * F2G TelcoLab Patch - 2026-10-13
++ * Added automatic message expiration based on num_bcast * rep_period
++ * Bug fix: Messages stayed "active" forever instead of expiring
++ */
++
+ #include <osmocom/core/utils.h>
+ #include <osmocom/core/linuxlist.h>
+ #include <osmocom/core/talloc.h>
+@@ -39,6 +45,9 @@
+ 
+ #define S(x)    (1 << (x))
+ 
++/* F2G: Timer for automatic message expiration */
++#define T_MSG_EXPIRATION 99
++
+ const struct value_string smscb_message_fsm_event_names[] = {
+ 	{ SMSCB_MSG_E_CHILD_DIED,	"CHILD_DIED" },
+ 	{ SMSCB_MSG_E_CREATE,		"CREATE" },
+@@ -56,6 +65,23 @@ const struct value_string smscb_message_fsm_event_names[] = {
+ 	{ 0, NULL }
+ };
+ 
++/* F2G: Calculate expiration timeout in seconds based on num_bcast and rep_period */
++static unsigned int calc_expiration_timeout(struct cbc_message *cbcmsg)
++{
++	unsigned int timeout_sec;
++	
++	/* If num_bcast is 0 (unlimited) or not set, don't set expiration timer */
++	if (cbcmsg->num_bcast == 0)
++		return 0;
++	
++	/* rep_period is the repetition period in seconds as provided by REST API */
++	/* timeout = num_bcast * rep_period */
++	timeout_sec = cbcmsg->num_bcast * cbcmsg->rep_period;
++	
++	/* Add 5 seconds margin for processing delays */
++	return timeout_sec + 5;
++}
++
+ static void smscb_fsm_init(struct osmo_fsm_inst *fi, uint32_t event, void *data)
+ {
+ 	struct cbc_message *cbcmsg = fi->priv;
+@@ -77,6 +103,7 @@ static void smscb_fsm_wait_write_ack(struct osmo_fsm_inst *fi, uint32_t event, v
+ {
+ 	struct cbc_message *cbcmsg = fi->priv;
+ 	struct osmo_fsm_inst *peer_fi;
++	unsigned int timeout_sec;
+ 
+ 	switch (event) {
+ 	case SMSCB_MSG_E_WRITE_ACK:
+@@ -88,7 +115,15 @@ static void smscb_fsm_wait_write_ack(struct osmo_fsm_inst *fi, uint32_t event, v
+ 				return;
+ 		}
+ 		rest_it_op_set_http_result(cbcmsg->it_op, 201, "Created"); // FIXME: error cases
+-		osmo_fsm_inst_state_chg(fi, SMSCB_S_ACTIVE, 0, 0);
++		
++		/* F2G: Start expiration timer based on num_bcast * rep_period */
++		timeout_sec = calc_expiration_timeout(cbcmsg);
++		if (timeout_sec > 0) {
++			LOGPFSML(fi, LOGL_INFO, "Starting expiration timer: %u seconds\n", timeout_sec);
++			osmo_fsm_inst_state_chg(fi, SMSCB_S_ACTIVE, timeout_sec, T_MSG_EXPIRATION);
++		} else {
++			osmo_fsm_inst_state_chg(fi, SMSCB_S_ACTIVE, 0, 0);
++		}
+ 		break;
+ 	default:
+ 		OSMO_ASSERT(0);
+@@ -257,7 +292,8 @@ static struct osmo_fsm_state smscb_fsm_states[] = {
+ 		.out_state_mask = S(SMSCB_S_ACTIVE) |
+ 				  S(SMSCB_S_WAIT_REPLACE_ACK) |
+ 				  S(SMSCB_S_WAIT_STATUS_ACK) |
+-				  S(SMSCB_S_WAIT_DELETE_ACK),
++				  S(SMSCB_S_WAIT_DELETE_ACK) |
++				  S(SMSCB_S_DELETED),  /* F2G: Allow transition to DELETED on expiration */
+ 		.action = smscb_fsm_active,
+ 	},
+ 	[SMSCB_S_WAIT_REPLACE_ACK] = {
+@@ -312,6 +348,11 @@ static int smscb_fsm_timer_cb(struct osmo_fsm_inst *fi)
+ 		/* onleave will take care of notifying the user */
+ 		osmo_fsm_inst_state_chg(fi, SMSCB_S_DELETED, 0, 0);
+ 		break;
++	/* F2G: Handle automatic expiration timer */
++	case T_MSG_EXPIRATION:
++		LOGPFSML(fi, LOGL_INFO, "Message expired (broadcast complete)\n");
++		osmo_fsm_inst_state_chg(fi, SMSCB_S_DELETED, 0, 0);
++		break;
+ 	default:
+ 		OSMO_ASSERT(0);
+ 	}

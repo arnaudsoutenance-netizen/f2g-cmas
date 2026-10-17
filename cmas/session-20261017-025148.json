@@ -1,0 +1,11 @@
+{
+  "session_name": "cmas",
+  "saved_at": "2026-10-17T02:51:48.783374+01:00",
+  "context_file": "/home/f2g/Videos/F2G_CMAS_FINAL/cmas/CONTEXTE_SESSION.txt",
+  "report_file": "/home/f2g/Videos/F2G_CMAS_FINAL/CMAS_LOCAL_INTEGRATION.md",
+  "report_sha256": "1eb1355a7eb915bc2c6081d9fe402f1e0dd2e1ea8f783c62c5f567fbf5da6630",
+  "audit_complete": true,
+  "broadcast_triggered": false,
+  "production_changes": false,
+  "context_type": "Compte rendu détaillé, non export intégral du chat"
+}

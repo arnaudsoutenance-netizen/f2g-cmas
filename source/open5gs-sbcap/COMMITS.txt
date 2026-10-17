@@ -1,0 +1,15 @@
+41d3c5a1b fix(mme): prevent crash on SBc-AP association close
+3ef23ebec feat(mme): SBc-AP Stop-Warning and multi-eNB warning area
+211498edf fix(mme): make SBc-AP Write-Replace-Warning work end to end
+bbd1549e1 Add SBc-AP support for Cell Broadcast (CMAS/PWS)
+b0de9eaad sbcap sctp server option added to mme.yaml, ipv4 only
+f3d8ff030 SBCAP Finite State Machine
+bfce438eb MME code changes that reflect SBCAP
+042662a7f Meson build update in mme
+dc813650e Some SBCAP defines
+aa854ae10 SBCAP changes, encoding/decoding
+origin	git@github.com:open5gs/open5gs.git (fetch)
+origin	git@github.com:open5gs/open5gs.git (push)
+
+Branch: sbcap-pr (from PR #4864)
+Date: Wed Oct 14 03:53:02 AM WAT 2026

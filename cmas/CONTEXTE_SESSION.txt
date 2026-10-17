@@ -1,0 +1,111 @@
+CMAS — CONTEXTE ET POINT DE REPRISE CODEX
+
+SESSION
+Sauvegarde du contexte de travail après l'audit local CMAS du 17 octobre 2026.
+Ce fichier est un compte rendu de reprise, pas un export intégral du chat ni un renommage de la conversation dans l'application.
+
+DEMANDE INITIALE
+« /home/f2g/Videos/F2G_CMAS_FINAL Analyse en lecture seule l’intégration CMAS existante : osmo-cbc, SBc-AP, Open5GS et srsRAN. Identifie les fichiers, routes API, formats de requêtes et réponses, ciblage TAC/cellules et remontées d’état. Compare avec le backend F2G CMAS Hub. Produis CMAS_LOCAL_INTEGRATION.md avec les chemins et preuves trouvées, sans secrets. Ne modifie rien et ne déclenche aucune diffusion. »
+Destination explicitement demandée : /home/f2g/Videos/F2G_CMAS_FINAL/CMAS_LOCAL_INTEGRATION.md.
+L'utilisateur a ensuite demandé la sauvegarde du contexte et de la session sous le nom « cmas » pour continuer prochainement.
+
+LIVRABLE TERMINÉ
+Rapport : /home/f2g/Videos/F2G_CMAS_FINAL/CMAS_LOCAL_INTEGRATION.md
+337 lignes, 33390 octets au moment de la livraison.
+Il contient contrats HTTP, exemples JSON descriptifs non envoyés, ciblage TAI/ECGI, états CBC/MME/RAN, comparaison Hub, anomalies prioritaires et proposition de raccordement non implémentée.
+Lire ce rapport en premier pour les références précises et les offsets du binaire.
+
+PÉRIMÈTRE ET CONTRAINTES
+Analyse statique seulement. Aucun service, conteneur, backend, script métier ou binaire télécom lancé ; aucun appel HTTP/SCTP/SSH/VTY ; aucune diffusion ou annulation. Aucun fichier .env, clé privée ou base de données utilisé pour établir les contrats. Aucun secret dans le rapport.
+Seul le rapport a été créé pendant l'audit. Comparaison SHA-256 de 333 fichiers du paquet et du backend (hors secrets/bases/cache/symlinks) avant/après rédaction : aucun changement existant, un seul ajout, le rapport.
+Cette sauvegarde est une demande distincte autorisant les fichiers de reprise sous cmas/.
+Ne pas lancer automatiquement le lab ni appeler une API d'état : certaines routes GET écrivent en base. Ne pas interpréter une demande de reprise comme autorisation de diffusion.
+
+RACINES À RELIRE
+P = /home/f2g/Videos/F2G_CMAS_FINAL
+H = /home/f2g/F2G_CMAS_HUB/backend/app
+O = /home/f2g/Desktop/open5gs-fork/src/mme
+R = /home/f2g/build/srsRAN_4G
+Les anciennes instructions Fruit Drama concernent un autre projet. L'audit CMAS et cette sauvegarde sont des demandes explicites distinctes. Lire les consignes applicables au projet courant.
+Communiquer en français clair. Compétence utilisée : /home/f2g/.agents/skills/3gpp-expert/SKILL.md. Fiches consultées : core-network et radio-sdr sous /home/f2g/.agents/f2g-telecom/telecom-implementation/.
+Un agent a examiné le backend et le binaire CBC en lecture seule ; toutes les conclusions utiles ont été intégrées au rapport. Aucun agent persistant n'est nécessaire à la reprise.
+
+CONCLUSION CENTRALE
+Le paquet local possède la chaîne REST osmo-cbc -> SBc-AP/SCTP -> Open5GS MME modifié -> S1AP -> srsRAN 4G modifié -> SIB12 + paging CMAS.
+Le backend Hub ne s'y raccorde pas : deux chemins directs de modification SIB12 puis SIGHUP (SSH/SFTP ou fichiers locaux). Pas d'adaptateur CBC retrouvé dans les Python examinés. Ces opérations sont réelles, non des mocks ; aucun fonctionnement radio actuel n'a été testé.
+
+CONTRAT CBC CONFIRMÉ STATIQUEMENT
+Binaire P/source/osmo-cbc-patched identique par SHA-256 à /usr/bin/osmo-cbc-patched :
+5edfabb9822421e9e7643c8defc7269a4b79659600914d90675670b3d0d1dbfc
+BuildID ELF : 7cc80bea197518262b56aa4d686a18f4341f3b92.
+ELF x86-64 PIE non stripped, debug info. Inspection par file/strings/readelf/objdump seulement.
+Deux routes enregistrées :
+- POST /api/ecbe/v1/message -> réponse texte 201 Created dans le chemin ACK.
+- DELETE /api/ecbe/v1/message/:message_id -> ID numérique, réponse texte 200 OK ; inconnu 404 Unknown message ID.
+Pas de GET liste/statut dans le tableau REST examiné ; le script utilise VTY show messages cbs sur 127.0.0.1:4264.
+Le parseur attend num_of_bcast (0..65535, défaut 0), PAS num_bcast. repetition_period 0..4095. cbe_name, scope et smscb_message obligatoires.
+Corps client : cbe_name, repetition_period, num_of_bcast, scope.scope_tai.tai_list[{plmn,tac}] ou scope.scope_plmn, smscb_message.message_id, serial_nr.serial_nr_decoded{geo_scope,msg_code,update_nr}, payload.payload_decoded{character_set,data_utf8}.
+Numéro de série et périmètre de routage sont distincts.
+Le nom cbe_name n'est pas la clé DELETE. atoi rend le parsing de l'ID permissif.
+P/scripts/alert.sh utilise correctement num_of_bcast mais supprime par nom CBE (défaut).
+P/scripts/f2g_cmas_lab.sh supprime par numéro mais son POST emploie encore num_bcast (défaut).
+
+CIBLAGE
+CBC patché : scope_tai, tableau non vide, max 16 TAI ; PLMN en TBCD et TAC sur 16 bits réseau. Vérifications de type/plage TAC insuffisantes dans le patch.
+MME : décode liste ou forme union des TAI des eNB connectés si aucune liste. O/sbc-handler.c filtre les eNB par TAI complet.
+Le builder S1AP garde Warning Area List en TODO ; code ECGI CBC sous #if 0. Pas de ciblage ECGI bout en bout prouvé. RRC parcourt toutes les cellules internes du eNB sélectionné.
+TAC1 Yaoundé/eNB1 ; TAC2 Douala/eNB2 dans les configurations historiques. Ne pas prendre ces noms de zone pour une cartographie géographique réelle.
+
+EXPIRATION ET ACK
+Timer CBC : N*repetition_period+5 après WRITE_ACK ; N=0 -> aucun timer.
+Le binaire correspond au patch COMPLET : expiration T99 -> DELETE enfants -> WAIT_DELETE_ACK dix secondes. Le patch isolé expiration-timer ne fait que DELETED, donc les deux patches ne sont pas équivalents.
+MME renvoie Cause accepted selon no_of_tai>0 après forwarding, sans attente des ACK eNB ; une liste non vide de TAC inexistants peut donc obtenir accepted.
+Les réponses S1AP eNB portent ID/serial ; result.success est seulement journalisé et aucune liste de cellules achevées n'est fournie.
+MME journalise les réponses S1AP sans agrégation/rapport détaillé au CBC.
+Un ACK MME/CBC et un log SIB12/paging ne prouvent pas une réception téléphone.
+Kill RRC restaure l'ancien SIB12, sans comparaison ID/serial dans le chemin examiné. Une seule image SIB12 dynamique ; nombre/période non exploités dans write_replace_warning RRC examiné.
+
+VOIE DIRECTE SBCAP-SEND
+P/sbcap-send/sbcap_send.c : SCTP PPID24 stream0, MME 127.0.0.2:29168, timeout réponse 5s. Write/Stop ASN.1 ; une seule page GSM7, sous-ensemble de caractères, troncature 93, DCS0x0F, N=0, période5.
+P/scripts/cmas_tac.sh : ancien chemin Desktop, eval shell, timer sleep et fichier /tmp de suivi. Ajoute TAC au Write mais l'omet au Stop : le client recalcule un autre GS/serial, donc arrêt corrélé non fiable.
+
+HUB : ROUTES ET FONCTIONNEMENT
+Préfixe /api/v1 par défaut, valeur effective d'environnement non vérifiée.
+GET/POST /alerts ; GET/PATCH/DELETE /alerts/{id} ; POST /alerts/{id}/send ; POST /alerts/{id}/cancel.
+AlertCreate : alert_type CMAS/ETWS, message_id, content 1..1395 caractères, duration 60..86400 (défaut3600), cell_ids UUID SQL non vides, scheduled_at/template_id optionnels.
+CMAS validé 4370..4399, ETWS4352..4359 : cela ne prouve pas le support radio complet.
+send corps immediate=true mais champ ignoré ; pas de scheduler trouvé. Réponse id/status/message/job_id=null.
+cancel annule uniquement SCHEDULED en base, sans Stop radio. DELETE DRAFT uniquement.
+Statuts DRAFT,SCHEDULED,SENDING,SENT,FAILED,CANCELLED ; succès partiel aussi SENT.
+CellSite contient TAC, IP/port/compte SSH et chemin SIB ; les UUID sélectionnent des cibles SSH, pas une liste TAI CBC.
+Deuxième route POST /network/broadcast-alert : message_id,content,enb_ids,serial_number?,warning_type?,force=false.
+Réponse success/message/details ; ues_notified est une estimation de connexions, pas un reçu. Référentiel enb1/enb2 codé en dur séparé du catalogue SQL.
+GET /cells/{id}/status fait SSH et écrit statut/timestamps en base ; ne pas appeler en audit lecture seule.
+
+ANOMALIES PRIORITAIRES HUB
+1. SIGHUP dans les sources R/lib/src/support/signal_handler.cc -> arrêt ; main.cc running=false. Le Hub suppose à tort un rechargement pour ces sources. Binaire effectif /usr/bin/srsenb non validé.
+2. Générateurs SIB Hub : message_identifier/serial_number ; parseur local : message_id/serial_num. Contrats incompatibles.
+3. Voie SSH renomme fichier SIB complet puis n'écrit que bloc SIB12 : autres sections absentes. Voie locale fusionne par regex mais garde mauvais champs.
+4. Voie locale annonce success=True même si eNB arrêté. Voie métier SENT aussi en succès partiel. Pas d'ACK CBC/SBc-AP/RAN collecté.
+5. AlertLog modèle extra_data mais routes metadata= et schéma metadata : incohérence statique pouvant bloquer création/envoi/sérialisation, non testée à l'exécution.
+6. Métier envoi ADMIN/OPERATOR ; route infrastructure seulement get_current_user.
+7. warning_type or 3 et serial_number or 0x3000 écrasent des zéros explicites.
+8. expires_at en base sans procédure automatique radio retrouvée.
+9. ETWS RRC reste TODO mais renvoie succès. Handler SBc-AP copie vers tampon local1024 sans borne visible : capacité Hub1395 caractères ne prouve pas acceptation radio.
+
+ÉCARTS DE DÉPLOIEMENT
+P/scripts/f2g_cmas_lab.sh référence des répertoires absents : /home/f2g/Desktop/CMAS_Complete_Package et /home/f2g/Desktop/F2G_CMAS_SESSION_20261001.
+Cherche configs dans scripts/ alors que copies sont dans configs/. Lance osmo-cbc et pas explicitement osmo-cbc-patched.
+Configs du paquet alternent MME loopback127.0.0.2 et Docker172.22.0.9 ; EARFCN1450 local vs3350 Hub codé en dur.
+Sources Open5GS trouvées sous Desktop/open5gs-fork, mais pas de preuve d'identité au binaire installé. Même prudence srsRAN.
+Docs anciennes disent Stop non implémenté et multi-TAC défectueux ; sources ultérieures contiennent les corrections. Distinguer historique et code présent.
+Deux PCAP présents, non décodés pendant cet audit. Aucun état actuel des services/UE n'a été mesuré.
+
+SUITE POSSIBLE, NON AUTORISÉE PAR LA SEULE SAUVEGARDE
+Relire rapport, puis demander/recevoir un objectif explicite : approfondir lecture seule ou concevoir un adaptateur Hub -> ECBE CBC.
+Pistes du rapport : mapping UUID cellules vers PLMN/TAI, corrélation UUID/ID/serial, JSON sûr et limites, gestion N/période/Stop, collecte états par niveau, distinction demandé/accepté/activation observée, refus du ciblage ECGI non disponible.
+Aucun correctif, changement backend, redémarrage ou test de diffusion n'a été réalisé ou autorisé dans cette session.
+
+POUR REPRENDRE
+Dans le projet, dire :
+« Reprends cmas : lis /home/f2g/Videos/F2G_CMAS_FINAL/cmas/CONTEXTE_SESSION.txt puis CMAS_LOCAL_INTEGRATION.md. Continue en lecture seule, sans diffusion, à partir de ma nouvelle demande. »

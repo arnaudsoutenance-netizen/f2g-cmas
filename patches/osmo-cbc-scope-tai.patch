@@ -1,0 +1,200 @@
+diff --git a/include/osmocom/cbc/cbc_message.h b/include/osmocom/cbc/cbc_message.h
+--- a/include/osmocom/cbc/cbc_message.h
++++ b/include/osmocom/cbc/cbc_message.h
+@@ -43,8 +43,21 @@ struct smscb_message {
+ 	};
+ };
+ 
++/* Maximum number of TAIs in a scope_tai list */
++#define CBC_MAX_TAI 16
++
++/* TAI (Tracking Area Identity) for scope_tai */
++struct cbc_tai {
++	char plmn[7];	/* MCC+MNC as string, e.g. "00101" */
++	uint16_t tac;	/* Tracking Area Code */
++};
++
+ enum cbc_message_scope {
+ 	CBC_MSG_SCOPE_PLMN,
++	CBC_MSG_SCOPE_TAI,		/* F2G: List of TAIs (3GPP TS 29.168) */
++	CBC_MSG_SCOPE_EUTRAN_CGI,	/* List of cells (future) */
+ 	/* FIXME: more local/regional scopes than PLMN-wide */
+ };
+ 
+@@ -72,7 +85,12 @@ struct cbc_message {
+ 	uint16_t num_bcast;		/* number of broadcasts requested (0=unlimited) */
+ 
+ 	enum cbc_message_scope scope;
+-	/* FIXME: data for other scopes than PLMN-wide */
++	/* F2G: TAI list for CBC_MSG_SCOPE_TAI */
++	union {
++		struct {
++			struct cbc_tai tai[CBC_MAX_TAI];
++			unsigned int num_tai;
++		} tai_list;
++	} u;
+ 
+ 	/* SMSCB message with id, serial, dcs, pages, ... */
+ 	struct smscb_message msg;
+diff --git a/src/rest_api.c b/src/rest_api.c
+--- a/src/rest_api.c
++++ b/src/rest_api.c
+@@ -520,12 +520,53 @@ static int json2cbc_message(struct cbc_message *out, void *ctx, json_t *in, cons
+ 
+ 	/* [Geographic] Scope (M) */
+ 	jtmp = json_object_get(in, "scope");
+ 	if (!jtmp) {
+ 		*errstr = "CBCMSG 'scope' is mandatory";
+ 		return -EINVAL;
+ 	}
+ 
+-	if ((jtmp = json_object_get(jtmp, "scope_plmn"))) {
++	json_t *jtai = json_object_get(jtmp, "scope_tai");
++	json_t *jplmn = json_object_get(jtmp, "scope_plmn");
++	
++	if (jtai && json_is_object(jtai)) {
++		/* F2G: Parse scope_tai - List of TAIs */
++		out->scope = CBC_MSG_SCOPE_TAI;
++		out->u.tai_list.num_tai = 0;
++		
++		json_t *jtai_list = json_object_get(jtai, "tai_list");
++		if (jtai_list && json_is_array(jtai_list)) {
++			size_t idx;
++			json_t *jtai_entry;
++			json_array_foreach(jtai_list, idx, jtai_entry) {
++				if (out->u.tai_list.num_tai >= CBC_MAX_TAI) {
++					*errstr = "CBCMSG 'scope_tai' too many TAIs (max 16)";
++					return -EINVAL;
++				}
++				
++				const char *plmn = json_string_value(json_object_get(jtai_entry, "plmn"));
++				json_t *jtac = json_object_get(jtai_entry, "tac");
++				
++				if (!plmn || !jtac) {
++					*errstr = "CBCMSG 'scope_tai' entry missing plmn or tac";
++					return -EINVAL;
++				}
++				
++				struct cbc_tai *tai = &out->u.tai_list.tai[out->u.tai_list.num_tai];
++				strncpy(tai->plmn, plmn, sizeof(tai->plmn) - 1);
++				tai->tac = json_integer_value(jtac);
++				out->u.tai_list.num_tai++;
++			}
++		} else {
++			*errstr = "CBCMSG 'scope_tai' requires 'tai_list' array";
++			return -EINVAL;
++		}
++		
++		if (out->u.tai_list.num_tai == 0) {
++			*errstr = "CBCMSG 'scope_tai' tai_list is empty";
++			return -EINVAL;
++		}
++	} else if (jplmn) {
+ 		out->scope = CBC_MSG_SCOPE_PLMN;
+ 	} else {
+-		*errstr = "CBCMSG only 'scope_plmn' supported";
++		*errstr = "CBCMSG 'scope' must be 'scope_plmn' or 'scope_tai'";
+ 		return -EINVAL;
+ 	}
+ 
+diff --git a/src/sbcap_msg.c b/src/sbcap_msg.c
+--- a/src/sbcap_msg.c
++++ b/src/sbcap_msg.c
+@@ -28,6 +28,8 @@
+ #include <osmocom/sbcap/sbcap_common.h>
+ #include <osmocom/sbcap/SBcAP_Write-Replace-Warning-Request.h>
+ #include <osmocom/sbcap/SBcAP_Stop-Warning-Request.h>
++#include <osmocom/sbcap/SBcAP_TAI.h>
++#include <osmocom/sbcap/SBcAP_TAI-List-for-Warning.h>
+ 
+ #include "internal.h"
+ 
+@@ -42,6 +44,54 @@ static void msgb_put_sbcap_cell_list(const struct cbc_message *cbcmsg, void *voi
+ /* ... existing cell list code ... */
+ }
+ 
++/* F2G: Build TAI-List-for-Warning from cbc_message tai_list
++ * 3GPP TS 29.168 Section 8.4.4 */
++static void msgb_put_sbcap_tai_list(const struct cbc_message *cbcmsg, 
++				    SBcAP_TAI_List_for_Warning_t *tai_list)
++{
++	unsigned int i;
++	
++	for (i = 0; i < cbcmsg->u.tai_list.num_tai; i++) {
++		const struct cbc_tai *tai = &cbcmsg->u.tai_list.tai[i];
++		SBcAP_TAI_t *asn_tai;
++		uint8_t plmn_enc[3];
++		uint8_t tac_enc[2];
++		
++		asn_tai = CALLOC(1, sizeof(*asn_tai));
++		if (!asn_tai)
++			continue;
++		
++		/* Encode PLMN Identity (MCC+MNC) 
++		 * Format: "00101" -> MCC=001, MNC=01 */
++		if (strlen(tai->plmn) >= 5) {
++			/* Simple encoding for test PLMN 00101 */
++			plmn_enc[0] = 0x00;  /* MCC digit 2 | MCC digit 1 */
++			plmn_enc[1] = 0xf1;  /* MNC digit 3 | MCC digit 3 (f=filler) */
++			plmn_enc[2] = 0x10;  /* MNC digit 2 | MNC digit 1 */
++			
++			/* For PLMN 00101: encode as 00 f1 10 */
++			plmn_enc[0] = ((tai->plmn[1] - '0') << 4) | (tai->plmn[0] - '0');
++			plmn_enc[1] = 0xf0 | (tai->plmn[2] - '0');
++			plmn_enc[2] = ((tai->plmn[4] - '0') << 4) | (tai->plmn[3] - '0');
++		}
++		
++		asn_tai->pLMNidentity.buf = MALLOC(3);
++		asn_tai->pLMNidentity.size = 3;
++		memcpy(asn_tai->pLMNidentity.buf, plmn_enc, 3);
++		
++		/* Encode TAC (2 bytes, big endian) */
++		tac_enc[0] = (tai->tac >> 8) & 0xff;
++		tac_enc[1] = tai->tac & 0xff;
++		
++		asn_tai->tAC.buf = MALLOC(2);
++		asn_tai->tAC.size = 2;
++		memcpy(asn_tai->tAC.buf, tac_enc, 2);
++		
++		/* Add to list */
++		ASN_SEQUENCE_ADD(&tai_list->list, asn_tai);
++		
++		LOGP(DSBcAP, LOGL_INFO, "Added TAI: PLMN=%s TAC=%u\n", tai->plmn, tai->tac);
++	}
++}
++
+ struct msgb *sbcap_gen_write_replace_warning_req(void *ctx, const struct cbc_message *cbcmsg)
+ {
+ 	/* ... existing code until switch(cbcmsg->scope) ... */
+@@ -130,10 +180,25 @@ struct msgb *sbcap_gen_write_replace_warning_req(void *ctx, const struct cbc_mes
+ 
+ 	switch (cbcmsg->scope) {
+ 	case CBC_MSG_SCOPE_PLMN:
+ 		break; /* Nothing to be done :*/
+-#if 0
+-	case CBC_MSG_SCOPE_EUTRAN_CGI:
+-		/* ... existing cell list code ... */
++	case CBC_MSG_SCOPE_TAI:
++		/* F2G: Warning Area List with TAI-List-for-Warning
++		 * 3GPP TS 29.168 Section 8.4.4, IE id = 15 */
++		ie = sbcap_alloc_Write_Replace_Warning_Request_IE(15, SBcAP_Criticality_ignore,
++			SBcAP_Write_Replace_Warning_Request_IEs__value_PR_Warning_Area_List);
++		if (!ie)
++			goto err;
++		
++		/* Set choice to tracking_Area_List_for_Warning (index 1) */
++		ie->value.choice.Warning_Area_List.present = 
++			SBcAP_Warning_Area_List_PR_tracking_Area_List_for_Warning;
++		
++		/* Build TAI list */
++		msgb_put_sbcap_tai_list(cbcmsg, 
++			&ie->value.choice.Warning_Area_List.choice.tracking_Area_List_for_Warning);
++		
++		ASN_SEQUENCE_ADD(as_pdu, ie);
++		LOGP(DSBcAP, LOGL_INFO, "Added Warning-Area-List with %u TAI(s)\n", 
++		     cbcmsg->u.tai_list.num_tai);
+ 		break;
+-#endif
+ 	default:
+ 		OSMO_ASSERT(0);
+ 	}
